@@ -66,3 +66,5 @@ The publication gate additionally checks full Git history; never check secrets o
 ## Crash recovery and receipts
 
 Each spooled PDF has a sibling `.json` receipt containing its opaque job ID, SHA-256, byte size, state, timestamp and (after success) remote drive-item ID. States are `Queued`, `Uploading`, `Uploaded` and `Review`. A completed remote upload is recorded before local archival. On restart, `Uploaded` jobs can resume archival without reuploading. An interrupted `Uploading` job is held for manual reconciliation, not silently replayed. Receipts are locally generated operational metadata: restrict their access and retention. This is a conservative first version; the operator-facing reconciliation command and automatic transient-error scheduling are still missing.
+
+The health command now separates Queued, Uploading, Uploaded-awaiting-archive, Review, missing/invalid receipts and orphan receipts. The worker no longer performs a racy remote GET before the documented conflict-fail upload session.
