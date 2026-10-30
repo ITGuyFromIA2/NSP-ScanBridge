@@ -15,3 +15,5 @@
 - Add private bounded backoff and retry-phase classifiers with offline tests; automatic retries are intentionally not yet enabled.
 - Enforce receipt state transition restrictions and immutable remote IDs after upload acknowledgement.
 - Add PHI-minimizing queue health thresholds for monitoring integrations.
+
+- Add optional Graph-based dispatch escalation with persistent duplicate suppression, a scheduled monitoring entry point, and a fail-closed configuration test.
