@@ -51,11 +51,11 @@ The publication gate additionally checks full Git history; never check secrets o
 - `tools/Test-Repo.ps1` includes offline intake persistence checks (not yet executed by this GitHub-only session).
 - See `docs/DEPLOYMENT.md` and `config/ScanBridge.example.psd1`.
 
-**Known gaps:** Graph conditional upload and 404 response handling need Windows/tenant validation; binary PDF upload depends on `Invoke-MgGraphRequest -InputFilePath` rather than the JSON-only shared wrapper; ambiguous remote responses require operator reconciliation; automated backoff/alerts and upload sessions remain to be implemented.
+**Known gaps:** Graph conditional upload and 404 response handling need Windows/tenant validation; binary upload uses a Graph-created preauthenticated upload session and `Invoke-RestMethod` chunk PUTs without authorization headers; ambiguous remote responses require operator reconciliation; automated backoff/alerts and upload sessions remain to be implemented.
 
 ## Immediate next milestones
 
-1. Verify the implemented small-file binary upload and overwrite safeguards using synthetic PDFs in a test library.
+1. Verify upload-session conflict behavior and upload acknowledgement using synthetic PDFs in a test library.
 2. Implement durable file claims / idempotent upload and archive reconciliation.
 3. Add permissions-limited tenant setup, health reporting and integration tests.
 4. Validate SYSTEM/LocalMachine certificate access on a test host.
