@@ -72,11 +72,7 @@ function Invoke-NSPScanBridge {
                     continue
                 }
                 if ($receipt.State -eq 'Uploaded') {
-                    Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Uploaded -RemoteId ([string]$result.id)
-                    $target = Join-Path $archive $job.Name
-                    if (Test-Path -LiteralPath $target) { throw 'Archive collision for uploaded job.' }
-                    [IO.File]::Move($job.FullName, $target)
-                    [IO.File]::Move($receiptPath, ([IO.Path]::ChangeExtension($target, '.json')))
+                    Complete-NSPScanBridgeArchive -PdfPath $job.FullName -ArchiveDirectory $archive
                     [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'Archived' }
                     continue
                 }
@@ -87,7 +83,7 @@ function Invoke-NSPScanBridge {
                 $name = [uri]::EscapeDataString($job.Name)
                 $baseUri = "https://graph.microsoft.com/v1.0/drives/$drive/items/$($folder):/$name"
                 try {
-                    if ($job.Length -gt 250MB) { throw 'Oversized file: upload session required.' }
+                    if ($job.Length -gt 250MB) { throw 'Configured development size limit exceeded.' }
                     # Reject ambiguous retries, rather than accidentally replacing an existing file.
                     $remote = $null
                     try { $remote = Invoke-MgGraphRequest -Method GET -Uri ($baseUri + ':') -OutputType PSObject -ErrorAction Stop }
@@ -101,10 +97,8 @@ function Invoke-NSPScanBridge {
                     if (-not $result.id -or [long]$result.size -ne [long]$job.Length) {
                         throw 'No matching remote upload acknowledgement.'
                     }
-                    $target = Join-Path $archive $job.Name
-                    if (Test-Path -LiteralPath $target) { throw 'Archive conflict.' }
-                    [IO.File]::Move($job.FullName, $target)
-                    [IO.File]::Move($receiptPath, ([IO.Path]::ChangeExtension($target, '.json')))
+                    Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Uploaded -RemoteId ([string]$result.id)
+                    Complete-NSPScanBridgeArchive -PdfPath $job.FullName -ArchiveDirectory $archive
                     [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'Delivered'; DriveItemId = [string]$result.id }
                 } catch {
                     if (Test-Path -LiteralPath $job.FullName) {
