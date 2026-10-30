@@ -5,6 +5,7 @@ foreach ($file in @('Save-NSPScanBridgeReceipt.ps1','Complete-NSPScanBridgeArchi
 }
 . (Join-Path $root 'Public/Resolve-NSPScanBridgeJob.ps1')
 $script:remoteBytes = [byte[]](37,80,68,70,45,49,46,52)
+function Get-MgContext { param($ErrorAction) return @{ AuthType = 'AppOnly' } }
 function Invoke-NSPGraphRequest {
     param($Method,$Uri,$ErrorAction)
     return @{ id='remote-confirmed'; size=8; '@microsoft.graph.downloadUrl'='https://example.invalid/file' }
