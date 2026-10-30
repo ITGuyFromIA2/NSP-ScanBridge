@@ -18,7 +18,7 @@ if (-not $SkipAlerts -and -not $IntakeOnly) {
     try {
         $configuration = Import-PowerShellDataFile -LiteralPath $ConfigurationPath -ErrorAction Stop
         if ($configuration.Alerts -and $configuration.Alerts.Enabled) {
-            Send-NSPScanBridgeAlert -ConfigurationPath $ConfigurationPath -ErrorAction Stop
+            Send-NSPScanBridgeAlert -ConfigurationPath $ConfigurationPath -WorkerFailed:$workerFailed -ErrorAction Stop
         }
     } catch {
         $alertFailed = $true
