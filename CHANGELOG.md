@@ -22,3 +22,5 @@
 - Add synthetic multi-chunk upload range and response contract test.
 
 - Wire limited transient retry/backoff into pre-transfer upload-session creation, with a simulated throttling test.
+
+- Implement explicit held-job remote SHA-256 reconciliation, local receipt verification, a worker lock, and repository-wide PowerShell parse gate.
