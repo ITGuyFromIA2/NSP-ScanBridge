@@ -31,3 +31,5 @@ The initial implementation still restricts files to 250 MB although it now uses 
 ## Archive crash recovery update
 
 The worker now scans spool receipts for completed PDF moves whose receipt still remains in spool. It verifies that the receipt records a successful upload and validates the archived PDF's SHA-256 before moving the receipt to Archive. Conflicting or incomplete states remain held for human review; the worker does not reupload these files. A synthetic offline test exercises the interrupted move and an idempotent rerun. No automatic cloud-side reconciliation is implemented.
+
+Health reporting now surfaces held/review and invalid/orphan receipt counts, not just total pending files. A racy remote GET preflight was removed; conflict handling is delegated to the Graph upload-session fail policy, subject to live validation.
