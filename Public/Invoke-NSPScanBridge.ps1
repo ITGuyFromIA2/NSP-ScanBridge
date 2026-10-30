@@ -1,11 +1,11 @@
 function Invoke-NSPScanBridge {
     <#
     .SYNOPSIS
-        Performs one unattended scan intake and SharePoint delivery pass.
+        Runs one unattended scan intake and delivery pass.
     .DESCRIPTION
-        All spool, archive, and source paths must exist. Source and spool must share
-        a drive. Jobs receive opaque GUID filenames and are never deleted by this
-        function. Requires existing app-only Graph context unless -IntakeOnly.
+        Claims completed PDFs to a same-volume spool. Persists per-job receipts,
+        delivers via an app-only Graph upload session, and archives confirmed jobs.
+        Ambiguous uploads are held for review rather than blindly retried.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(
@@ -16,7 +16,7 @@ function Invoke-NSPScanBridge {
     $config = Import-PowerShellDataFile -LiteralPath $ConfigurationPath
     if (-not $config.Routes -or -not $config.LockPath) { throw 'Routes and LockPath are required.' }
     $lockPath = [IO.Path]::GetFullPath([string]$config.LockPath)
-    if (-not (Test-Path -LiteralPath (Split-Path -Parent $lockPath) -PathType Container)) { throw 'Lock directory is missing.' }
+    if (-not (Test-Path -LiteralPath (Split-Path -Parent $lockPath) -PathType Container)) { throw 'Lock directory does not exist.' }
     $lock = $null
     try {
         try {
@@ -38,100 +38,51 @@ function Invoke-NSPScanBridge {
             $source = [IO.Path]::GetFullPath([string]$route.Source)
             $spool = [IO.Path]::GetFullPath([string]$route.Spool)
             $archive = [IO.Path]::GetFullPath([string]$route.Archive)
-            foreach ($dir in @($source,$spool,$archive)) {
-                if (-not (Test-Path -LiteralPath $dir -PathType Container)) { throw 'A route directory is missing.' }
+            foreach ($directory in @($source,$spool,$archive)) {
+                if (-not (Test-Path -LiteralPath $directory -PathType Container)) { throw 'Route directory does not exist.' }
             }
             if ([IO.Path]::GetPathRoot($source) -ine [IO.Path]::GetPathRoot($spool)) { throw 'Source and spool must share a drive.' }
-            if ($source -ieq $spool -or $source -ieq $archive -or $spool -ieq $archive) { throw 'Route directories must differ.' }
+            if ($source -ieq $spool -or $source -ieq $archive -or $spool -ieq $archive) { throw 'Route directories must be distinct.' }
             $age = if ($route.ContainsKey('MinimumAgeSeconds')) { [int]$route.MinimumAgeSeconds } else { 20 }
             if ($age -lt 1) { throw 'MinimumAgeSeconds must be positive.' }
-            foreach ($candidate in @(Get-ChildItem -LiteralPath $source -Filter '*.pdf' -File)) {
+            foreach ($candidate in @(Get-ChildItem -LiteralPath $source -Filter '*.pdf' -File -ErrorAction Stop)) {
                 if (-not (Test-NSPScanBridgeFileReady -Path $candidate.FullName -MinimumAgeSeconds $age)) { continue }
                 $jobId = [guid]::NewGuid().ToString('N')
-                if ($PSCmdlet.ShouldProcess('Ready PDF', 'Claim to durable spool')) {
+                $claimedPath = Join-Path $spool ($jobId + '.pdf')
+                if ($PSCmdlet.ShouldProcess('Ready PDF', 'Claim into durable spool')) {
                     try {
-                        [IO.File]::Move($candidate.FullName, (Join-Path $spool ($jobId + '.pdf')))
-                        Save-NSPScanBridgeReceipt -PdfPath (Join-Path $spool ($jobId + '.pdf')) -State Queued
+                        [IO.File]::Move($candidate.FullName, $claimedPath)
+                        Save-NSPScanBridgeReceipt -PdfPath $claimedPath -State Queued
                         [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'Queued' }
                     } catch [IO.IOException] {
-                        Write-Warning 'PDF could not be claimed; retry on next pass.'
+                        Write-Warning 'A scan could not be claimed; it will be considered in the next pass.'
                     }
                 }
             }
             if ($IntakeOnly -or $WhatIfPreference) { continue }
-            # Complete crash-interrupted archive moves: receipt remained in spool,
-            # while its associated PDF has already moved to archive.
-            foreach ($orphanReceipt in @(Get-ChildItem -LiteralPath $spool -Filter '*.json' -File)) {
+            foreach ($orphanReceipt in @(Get-ChildItem -LiteralPath $spool -Filter '*.json' -File -ErrorAction Stop)) {
                 $orphanId = [IO.Path]::GetFileNameWithoutExtension($orphanReceipt.Name)
-                if ($orphanId -cnotmatch '^[0-9a-f]{32}
-            foreach ($job in @(Get-ChildItem -LiteralPath $spool -File -Filter '*.pdf')) {
-                if ($job.Name -cnotmatch '^[0-9a-f]{32}\.pdf$') { Write-Warning 'Unknown spool entry ignored.'; continue }
-                $jobId = [IO.Path]::GetFileNameWithoutExtension($job.Name)
-                $receiptPath = [IO.Path]::ChangeExtension($job.FullName, '.json')
-                if (-not (Test-Path -LiteralPath $receiptPath)) {
-                    Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Queued
-                }
-                $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
-                if ($receipt.State -eq 'Uploading' -or $receipt.State -eq 'Review') {
-                    [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'ManualReviewRequired' }
-                    continue
-                }
-                if ($receipt.State -eq 'Uploaded') {
-                    Complete-NSPScanBridgeArchive -PdfPath $job.FullName -ArchiveDirectory $archive
-                    [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'Archived' }
-                    continue
-                }
-                if ($receipt.State -ne 'Queued') { throw 'Unrecognized job receipt state.' }
-
-                try {
-                    if ($job.Length -gt 250MB) { throw 'Configured development size limit exceeded.' }
-                    # The upload-session fail policy is authoritative. A preflight GET
-                    # cannot prevent a race and can mishandle an otherwise normal 404.
-                    Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Uploading
-                    $result = Send-NSPScanBridgeUploadSession -Path $job.FullName -DriveId ([string]$route.DriveId) -FolderItemId ([string]$route.FolderItemId) -Name $job.Name
-                    if (-not $result.id -or [long]$result.size -ne [long]$job.Length) {
-                        throw 'No matching remote upload acknowledgement.'
-                    }
-                    Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Uploaded -RemoteId ([string]$result.id)
-                    Complete-NSPScanBridgeArchive -PdfPath $job.FullName -ArchiveDirectory $archive
-                    [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'Delivered'; DriveItemId = [string]$result.id }
-                } catch {
-                    if (Test-Path -LiteralPath $job.FullName) {
-                        $current = Get-Content -LiteralPath $receiptPath -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
-                        if ($current.State -eq 'Uploading') {
-                            Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Review
-                        }
-                    }
-                    Write-Warning ("Delivery held for job {0}; inspect in protected environment." -f $jobId)
-                    [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'PendingReviewOrRetry' }
-                }
-            }
-        }
-    } finally {
-        if ($null -ne $lock) { $lock.Dispose() }
-    }
-}
-) { continue }
-                $orphanPdf = Join-Path $spool ($orphanId + '.pdf')
+                if ($orphanId -cnotmatch '^[0-9a-f]{32}$') { continue }
+                $spooledPdf = Join-Path $spool ($orphanId + '.pdf')
                 $archivedPdf = Join-Path $archive ($orphanId + '.pdf')
-                if (-not (Test-Path -LiteralPath $orphanPdf) -and (Test-Path -LiteralPath $archivedPdf)) {
+                if (-not (Test-Path -LiteralPath $spooledPdf) -and (Test-Path -LiteralPath $archivedPdf)) {
                     try {
-                        Complete-NSPScanBridgeArchive -PdfPath $orphanPdf -ArchiveDirectory $archive
+                        Complete-NSPScanBridgeArchive -PdfPath $spooledPdf -ArchiveDirectory $archive
                         [pscustomobject]@{ Route = $route.Name; JobId = $orphanId; State = 'ArchiveRecovered' }
                     } catch {
                         Write-Warning ("Archive recovery requires review for job {0}." -f $orphanId)
                     }
                 }
             }
-            foreach ($job in @(Get-ChildItem -LiteralPath $spool -File -Filter '*.pdf')) {
+            foreach ($job in @(Get-ChildItem -LiteralPath $spool -Filter '*.pdf' -File -ErrorAction Stop)) {
                 if ($job.Name -cnotmatch '^[0-9a-f]{32}\.pdf$') { Write-Warning 'Unknown spool entry ignored.'; continue }
                 $jobId = [IO.Path]::GetFileNameWithoutExtension($job.Name)
                 $receiptPath = [IO.Path]::ChangeExtension($job.FullName, '.json')
                 if (-not (Test-Path -LiteralPath $receiptPath)) {
                     Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Queued
                 }
-                $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
-                if ($receipt.State -eq 'Uploading' -or $receipt.State -eq 'Review') {
+                $receipt = Get-Content -LiteralPath $receiptPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                if ($receipt.State -in @('Uploading','Review')) {
                     [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'ManualReviewRequired' }
                     continue
                 }
@@ -140,26 +91,13 @@ function Invoke-NSPScanBridge {
                     [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'Archived' }
                     continue
                 }
-                if ($receipt.State -ne 'Queued') { throw 'Unrecognized job receipt state.' }
-
-                $drive = [uri]::EscapeDataString([string]$route.DriveId)
-                $folder = [uri]::EscapeDataString([string]$route.FolderItemId)
-                $name = [uri]::EscapeDataString($job.Name)
-                $baseUri = "https://graph.microsoft.com/v1.0/drives/$drive/items/$($folder):/$name"
+                if ($receipt.State -ne 'Queued') { throw 'Unrecognized receipt state.' }
                 try {
                     if ($job.Length -gt 250MB) { throw 'Configured development size limit exceeded.' }
-                    # Reject ambiguous retries, rather than accidentally replacing an existing file.
-                    $remote = $null
-                    try { $remote = Invoke-MgGraphRequest -Method GET -Uri ($baseUri + ':') -OutputType PSObject -ErrorAction Stop }
-                    catch {
-                        $status = $_.Exception.ResponseStatusCode
-                        if ($null -eq $status -or [int]$status -ne 404) { throw }
-                    }
-                    if ($remote) { throw 'Remote file already exists; manual reconciliation required.' }
                     Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Uploading
                     $result = Send-NSPScanBridgeUploadSession -Path $job.FullName -DriveId ([string]$route.DriveId) -FolderItemId ([string]$route.FolderItemId) -Name $job.Name
                     if (-not $result.id -or [long]$result.size -ne [long]$job.Length) {
-                        throw 'No matching remote upload acknowledgement.'
+                        throw 'Upload response failed size or item ID verification.'
                     }
                     Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Uploaded -RemoteId ([string]$result.id)
                     Complete-NSPScanBridgeArchive -PdfPath $job.FullName -ArchiveDirectory $archive
