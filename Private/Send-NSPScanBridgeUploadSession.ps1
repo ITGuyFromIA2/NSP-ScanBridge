@@ -12,8 +12,26 @@ function Send-NSPScanBridgeUploadSession {
     $parent = [uri]::EscapeDataString($FolderItemId)
     $encodedName = [uri]::EscapeDataString($Name)
     $uri = "drives/$drive/items/$($parent):/$($encodedName):/createUploadSession"
-    $session = Invoke-NSPGraphRequest -Method POST -Uri $uri -Body @{
-        item = @{ '@microsoft.graph.conflictBehavior' = 'fail'; name = $Name }
+    $session = $null
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            $session = Invoke-NSPGraphRequest -Method POST -Uri $uri -Body @{
+                item = @{ '@microsoft.graph.conflictBehavior' = 'fail'; name = $Name }
+            } -ErrorAction Stop
+            break
+        } catch {
+            # Only retry documented transient HTTP responses before bytes are sent.
+            $status = 0
+            if ($null -ne $_.Exception.ResponseStatusCode) {
+                $status = [int]$_.Exception.ResponseStatusCode
+            } elseif ($null -ne $_.Exception.Response -and $null -ne $_.Exception.Response.StatusCode) {
+                $status = [int]$_.Exception.Response.StatusCode
+            }
+            if ($attempt -eq 3 -or -not (Test-NSPScanBridgeRetrySafe -Phase BeforeSession -StatusCode $status)) {
+                throw
+            }
+            Start-Sleep -Seconds (Get-NSPScanBridgeBackoff -Attempt $attempt)
+        }
     }
     if (-not $session.uploadUrl -or $session.uploadUrl -notmatch '^https://') {
         throw 'Graph did not provide an HTTPS upload URL.'
