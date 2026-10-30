@@ -37,3 +37,7 @@ Health reporting now surfaces held/review and invalid/orphan receipt counts, not
 ## Monitoring
 
 Run `Test-NSPScanBridgeHealth -ConfigurationPath <private-config> -MaximumPending 25 -MaximumPendingMinutes 10` as a read-only health check. Inspect `Healthy` and `Conditions`; do not record PDF names or content in central monitoring. This currently evaluates local state only and does not send alerts. Automatic transient retry policy is not wired into the worker, to avoid replaying ambiguous upload sessions without cloud reconciliation.
+
+## RMM check
+
+Run `scripts/Test-ScanBridgeHealth.ps1 -ConfigurationPath <private-config>` under an authorized local monitoring identity. Exit codes: `0` healthy; `2` queue thresholds or review conditions exceeded; `3` check could not complete. Output includes route name, counts and age only, not document filenames. Keep route names generic and configure the RMM to alert on nonzero exit codes.
