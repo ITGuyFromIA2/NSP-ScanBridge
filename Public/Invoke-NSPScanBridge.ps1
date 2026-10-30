@@ -69,7 +69,7 @@ function Invoke-NSPScanBridge {
                     if ($job.Length -gt 250MB) { throw 'Oversized file: upload session required.' }
                     # Reject ambiguous retries, rather than accidentally replacing an existing file.
                     $remote = $null
-                    try { $remote = Invoke-MgGraphRequest -Method GET -Uri $baseUri -OutputType PSObject -ErrorAction Stop }
+                    try { $remote = Invoke-MgGraphRequest -Method GET -Uri ($baseUri + ':') -OutputType PSObject -ErrorAction Stop }
                     catch {
                         $status = $_.Exception.ResponseStatusCode
                         if ($null -eq $status -or [int]$status -ne 404) { throw }
