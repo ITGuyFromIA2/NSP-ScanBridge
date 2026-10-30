@@ -8,6 +8,6 @@ Use `scripts/Send-ScanBridgeAlerts.ps1 -ConfigurationPath <private-config>` as a
 
 Messages contain only generic route labels, condition codes, counts, and age. Never include patient names, document names, PDF attachments, actual local paths or any tenant identifier. Treat route labels as potentially sensitive and choose generic names. On a repeated identical condition, a persistent alert marker suppresses duplicate emails. A changed condition signature can cause a new ticket.
 
-A Graph-accepted send is not confirmation that a ticket was opened. A crash after acceptance but before marker persistence may cause a duplicate. An unsuccessful send is not marked and can be retried. Because markers are not cleared on recovery, reoccurrence of the same condition may require operator reset or a future incident-lifecycle feature.
+A Graph-accepted send is not confirmation that a ticket was opened. A crash after acceptance but before marker persistence may cause a duplicate. An unsuccessful send is not marked and can be retried. After a healthy check, the marker is retained but marked resolved. A subsequent unhealthy occurrence can therefore produce a new ticket. Transient health flapping can still open repeat tickets; consider an operator-defined stable recovery window before production.
 
 **Status:** Development-only. Run offline tests and then synthetic live mail tests before using for production incidents.
