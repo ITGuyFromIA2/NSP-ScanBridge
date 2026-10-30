@@ -99,6 +99,12 @@ function Invoke-NSPScanBridge {
                     if (-not $result.id -or [long]$result.size -ne [long]$job.Length) {
                         throw 'Upload response failed size or item ID verification.'
                     }
+                    if ($route.ContainsKey('VerifyRemoteAfterUpload') -and [bool]$route.VerifyRemoteAfterUpload) {
+                        $readback = Test-NSPScanBridgeRemoteMatch -PdfPath $job.FullName -DriveId ([string]$route.DriveId) -FolderItemId ([string]$route.FolderItemId)
+                        if ($readback.Status -ne 'Verified' -or $readback.RemoteId -ne [string]$result.id) {
+                            throw 'Remote upload readback not verified; job held for review.'
+                        }
+                    }
                     Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Uploaded -RemoteId ([string]$result.id)
                     Complete-NSPScanBridgeArchive -PdfPath $job.FullName -ArchiveDirectory $archive
                     [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'Delivered'; DriveItemId = [string]$result.id }
