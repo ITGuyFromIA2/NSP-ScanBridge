@@ -40,6 +40,10 @@ try {
     if ($receipt.State -ne 'Queued' -or $receipt.Hash -ne (Get-FileHash $spoolFiles[0].FullName -Algorithm SHA256).Hash) {
         throw 'Receipt does not match queued PDF.'
     }
+    $alert = @(Test-NSPScanBridgeHealth -ConfigurationPath $configPath -MaximumPending 1)
+    if ($alert.Count -ne 1 -or $alert[0].Healthy -or $alert[0].Conditions -notcontains 'QueueDepth') {
+        throw 'Queue-depth alert was not raised.'
+    }
     $again = @(Invoke-NSPScanBridge -ConfigurationPath $configPath -IntakeOnly)
     if ($again.Count -ne 0) { throw 'Second pass unexpectedly claimed another job.' }
     if (-not (Test-Path -LiteralPath $spoolFiles[0].FullName)) { throw 'Second pass lost the queued PDF.' }
