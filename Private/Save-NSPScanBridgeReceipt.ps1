@@ -3,7 +3,8 @@ function Save-NSPScanBridgeReceipt {
     param(
         [Parameter(Mandatory)][string]$PdfPath,
         [Parameter(Mandatory)][ValidateSet('Queued','Uploading','Uploaded','Review')][string]$State,
-        [string]$RemoteId
+        [string]$RemoteId,
+        [switch]$VerifiedReconciliation
     )
     $pdf = Get-Item -LiteralPath $PdfPath -ErrorAction Stop
     $id = [IO.Path]::GetFileNameWithoutExtension($pdf.Name)
@@ -22,7 +23,7 @@ function Save-NSPScanBridgeReceipt {
             Queued = @('Queued','Uploading','Review')
             Uploading = @('Uploading','Uploaded','Review')
             Uploaded = @('Uploaded')
-            Review = @('Review')
+            Review = if ($VerifiedReconciliation) { @('Review','Uploaded') } else { @('Review') }
         }
         if (-not $allowed.ContainsKey([string]$previous.State) -or $State -notin $allowed[[string]$previous.State]) {
             throw 'Invalid receipt state transition.'
