@@ -41,3 +41,7 @@ Run `Test-NSPScanBridgeHealth -ConfigurationPath <private-config> -MaximumPendin
 ## RMM check
 
 Run `scripts/Test-ScanBridgeHealth.ps1 -ConfigurationPath <private-config>` under an authorized local monitoring identity. Exit codes: `0` healthy; `2` queue thresholds or review conditions exceeded; `3` check could not complete. Output includes route name, counts and age only, not document filenames. Keep route names generic and configure the RMM to alert on nonzero exit codes.
+
+## Held-job verification
+
+Use Resolve-NSPScanBridgeJob with an opaque JobId, RouteName, and the private ConfigurationPath. It reads the remote PDF, compares SHA-256, and only archives a confirmed exact match. Reconciliation holds the same worker lock. Keep spool access restricted and confirm sufficient free space. Unknown or mismatched remote copies remain held. Integration testing is required before operational use.
