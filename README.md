@@ -84,3 +84,5 @@ The upload-session creation step now retries up to three times for recognized tr
 ### Remote reconciliation
 
 A held job can be checked with `Resolve-NSPScanBridgeJob -ConfigurationPath <private-config> -RouteName RouteA -JobId <opaque-guid>`. The operator command requires an existing app-only Graph connection and serializes with the main worker lock. It reads the SharePoint document bytes into a disposable file **inside the restricted spool** and only marks the job `Uploaded` when local receipt SHA-256 and remote SHA-256 match. Missing, inaccessible or mismatched remote content is never accepted; no upload replay occurs. This is a deliberate opt-in recovery action, not automatic background reconciliation. Run with `-WhatIf` before use and validate against synthetic files.
+
+Optional VerifyRemoteAfterUpload route setting performs a remote PDF readback and SHA-256 comparison before archival. Leave it disabled until verified with synthetic files in the test site. It increases bandwidth and can hold a job if SharePoint has not made the new item readable yet.
