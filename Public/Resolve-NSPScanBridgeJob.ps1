@@ -14,6 +14,12 @@ function Resolve-NSPScanBridgeJob {
         [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{32}$')][string]$JobId
     )
     $config = Import-PowerShellDataFile -LiteralPath $ConfigurationPath -ErrorAction Stop
+    if (-not $config.LockPath) { throw 'LockPath is required.' }
+    $lock = $null
+    try {
+        $lock = [IO.File]::Open([IO.Path]::GetFullPath([string]$config.LockPath), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    } catch [IO.IOException] { throw 'ScanBridge worker or reconciler already holds the lock.' }
+    try {
     $routes = @($config.Routes | Where-Object { $_.Name -eq $RouteName })
     if ($routes.Count -ne 1) { throw 'Route must match exactly one configured entry.' }
     $route = $routes[0]
@@ -25,6 +31,9 @@ function Resolve-NSPScanBridgeJob {
     $receipt = Get-Content -LiteralPath $receiptPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
     if ($receipt.State -notin @('Review','Uploading')) { throw 'Job is not awaiting upload reconciliation.' }
     if ($receipt.State -eq 'Uploading') { throw 'Run worker first to classify interrupted Uploading state.' }
+    if ($receipt.JobId -ne $JobId -or $receipt.Hash -ne (Get-FileHash -LiteralPath $pdf -Algorithm SHA256).Hash) {
+        throw 'Local PDF fails receipt integrity verification.'
+    }
     $result = Test-NSPScanBridgeRemoteMatch -PdfPath $pdf -DriveId ([string]$route.DriveId) -FolderItemId ([string]$route.FolderItemId)
     if ($result.Status -ne 'Verified') {
         return [pscustomobject]@{ JobId=$JobId; Status=$result.Status; Archived=$false }
@@ -34,4 +43,5 @@ function Resolve-NSPScanBridgeJob {
         Complete-NSPScanBridgeArchive -PdfPath $pdf -ArchiveDirectory $route.Archive
         return [pscustomobject]@{ JobId=$JobId; Status='Verified'; Archived=$true }
     }
+    } finally { $lock.Dispose() }
 }
