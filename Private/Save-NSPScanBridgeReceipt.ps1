@@ -17,6 +17,23 @@ function Save-NSPScanBridgeReceipt {
     if ($previous -and ($previous.JobId -ne $id -or $previous.Hash -ne $hash)) {
         throw 'Job receipt does not match the PDF.'
     }
+    if ($previous) {
+        $allowed = @{
+            Queued = @('Queued','Uploading','Review')
+            Uploading = @('Uploading','Uploaded','Review')
+            Uploaded = @('Uploaded')
+            Review = @('Review')
+        }
+        if (-not $allowed.ContainsKey([string]$previous.State) -or $State -notin $allowed[[string]$previous.State]) {
+            throw 'Invalid receipt state transition.'
+        }
+        if ($previous.State -eq 'Uploaded' -and $RemoteId -ne $previous.RemoteId) {
+            throw 'An acknowledged remote item ID cannot change.'
+        }
+    }
+    if ($State -eq 'Uploaded' -and -not $RemoteId) {
+        throw 'Uploaded state requires remote item ID.'
+    }
     $receipt = @{
         Version = 1
         JobId = $id
