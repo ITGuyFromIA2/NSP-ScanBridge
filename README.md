@@ -72,3 +72,7 @@ The health command now separates Queued, Uploading, Uploaded-awaiting-archive, R
 ## Operational checks
 
 `Get-NSPScanBridgeHealth -ConfigurationPath <private-config>` returns queue counts and age; `Test-NSPScanBridgeHealth -ConfigurationPath <private-config> -MaximumPending 25 -MaximumPendingMinutes 10` classifies unsafe queue conditions without outputting source filenames. Monitoring returns values; delivery to an email/SIEM alert channel is a separate integration. Bounded exponential retry calculation and safe-phase classification are implemented as private helpers but not wired into the worker yet. Ambiguous upload results remain held.
+
+## Dispatch escalation
+
+Optional `Send-NSPScanBridgeAlert` and `scripts/Send-ScanBridgeAlerts.ps1` provide deduplicated, PHI-minimizing email escalation for unresolved queue/review conditions. Sending uses `NSP.M365.Graph` with a separate restricted app-only Mail.Send identity, and is disabled by default. Set the approved dispatch recipient only in private deployment configuration. See `docs/ALERTING.md` for permissions, monitoring and failure semantics.
