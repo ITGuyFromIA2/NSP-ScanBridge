@@ -1,0 +1,13 @@
+*.local.psd1
+*.local.json
+config/private/
+state/
+queue/
+logs/
+scans/
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+*.crt
