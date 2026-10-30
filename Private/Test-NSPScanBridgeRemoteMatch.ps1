@@ -34,7 +34,7 @@ function Test-NSPScanBridgeRemoteMatch {
     if (-not $downloadUrl -or $downloadUrl -notmatch '^https://') {
         return [pscustomobject]@{ Status = 'Unverified'; RemoteId = $null }
     }
-    $temporary = Join-Path ([IO.Path]::GetTempPath()) ('nsp-reconcile-' + [guid]::NewGuid().ToString('N') + '.tmp')
+    $temporary = Join-Path ([IO.Path]::GetDirectoryName($file.FullName)) ('nsp-reconcile-' + [guid]::NewGuid().ToString('N') + '.tmp')
     try {
         # Do not include the preauthenticated URL in exceptions, receipts or logs.
         try {
