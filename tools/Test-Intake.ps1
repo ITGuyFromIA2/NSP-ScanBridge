@@ -33,7 +33,7 @@ try {
     $spoolFiles = @(Get-ChildItem -LiteralPath (Join-Path $testRoot 'spool') -Filter '*.pdf' -File)
     if ($spoolFiles.Count -ne 1 -or $spoolFiles[0].Name -cnotmatch '^[0-9a-f]{32}\.pdf$') { throw 'Opaque spool name missing.' }
     $health = @(Get-NSPScanBridgeHealth -ConfigurationPath $configPath)
-    if ($health.Count -ne 1 -or $health[0].PendingCount -ne 1 -or $health[0].SourceCount -ne 0) { throw 'Health snapshot did not reflect the queued job.' }
+    if ($health.Count -ne 1 -or $health[0].PendingCount -ne 1 -or $health[0].SourceCount -ne 0 -or $health[0].QueuedCount -ne 1 -or $health[0].ReviewCount -ne 0) { throw 'Health snapshot did not reflect the queued job.' }
     $receiptPath = [IO.Path]::ChangeExtension($spoolFiles[0].FullName, '.json')
     if (-not (Test-Path -LiteralPath $receiptPath)) { throw 'Missing persistent receipt.' }
     $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
