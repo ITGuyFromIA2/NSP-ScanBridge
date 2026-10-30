@@ -76,3 +76,5 @@ The health command now separates Queued, Uploading, Uploaded-awaiting-archive, R
 ## Dispatch escalation
 
 Optional `Send-NSPScanBridgeAlert` and `scripts/Send-ScanBridgeAlerts.ps1` provide deduplicated, PHI-minimizing email escalation for unresolved queue/review conditions. Sending uses `NSP.M365.Graph` with a separate restricted app-only Mail.Send identity, and is disabled by default. Set the approved dispatch recipient only in private deployment configuration. See `docs/ALERTING.md` for permissions, monitoring and failure semantics.
+
+The unattended runner now invokes dispatch evaluation even when the ingestion worker throws, and the escalation handler emits generic WorkerFailure or HealthCheckFailed conditions rather than including sensitive exception messages. A synthetic two-chunk Graph upload test checks sequential byte ranges and final acknowledgement. These are source/test changes only; Windows and tenant integration remain outstanding.
