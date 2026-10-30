@@ -32,3 +32,5 @@ finally { Remove-Module $module.Name -Force -ErrorAction SilentlyContinue }
 & (Join-Path $PSScriptRoot 'Test-Receipts.ps1')
 
 & (Join-Path $PSScriptRoot 'Test-ArchiveRecovery.ps1')
+
+& (Join-Path $PSScriptRoot 'Test-RetryPolicy.ps1')
