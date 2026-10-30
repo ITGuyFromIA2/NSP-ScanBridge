@@ -51,6 +51,7 @@ function Invoke-NSPScanBridge {
                 if ($PSCmdlet.ShouldProcess('Ready PDF', 'Claim to durable spool')) {
                     try {
                         [IO.File]::Move($candidate.FullName, (Join-Path $spool ($jobId + '.pdf')))
+                        Save-NSPScanBridgeReceipt -PdfPath (Join-Path $spool ($jobId + '.pdf')) -State Queued
                         [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'Queued' }
                     } catch [IO.IOException] {
                         Write-Warning 'PDF could not be claimed; retry on next pass.'
@@ -61,6 +62,26 @@ function Invoke-NSPScanBridge {
             foreach ($job in @(Get-ChildItem -LiteralPath $spool -File -Filter '*.pdf')) {
                 if ($job.Name -cnotmatch '^[0-9a-f]{32}\.pdf$') { Write-Warning 'Unknown spool entry ignored.'; continue }
                 $jobId = [IO.Path]::GetFileNameWithoutExtension($job.Name)
+                $receiptPath = [IO.Path]::ChangeExtension($job.FullName, '.json')
+                if (-not (Test-Path -LiteralPath $receiptPath)) {
+                    Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Queued
+                }
+                $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+                if ($receipt.State -eq 'Uploading' -or $receipt.State -eq 'Review') {
+                    [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'ManualReviewRequired' }
+                    continue
+                }
+                if ($receipt.State -eq 'Uploaded') {
+                    Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Uploaded -RemoteId ([string]$result.id)
+                    $target = Join-Path $archive $job.Name
+                    if (Test-Path -LiteralPath $target) { throw 'Archive collision for uploaded job.' }
+                    [IO.File]::Move($job.FullName, $target)
+                    [IO.File]::Move($receiptPath, ([IO.Path]::ChangeExtension($target, '.json')))
+                    [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'Archived' }
+                    continue
+                }
+                if ($receipt.State -ne 'Queued') { throw 'Unrecognized job receipt state.' }
+
                 $drive = [uri]::EscapeDataString([string]$route.DriveId)
                 $folder = [uri]::EscapeDataString([string]$route.FolderItemId)
                 $name = [uri]::EscapeDataString($job.Name)
@@ -75,6 +96,7 @@ function Invoke-NSPScanBridge {
                         if ($null -eq $status -or [int]$status -ne 404) { throw }
                     }
                     if ($remote) { throw 'Remote file already exists; manual reconciliation required.' }
+                    Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Uploading
                     $result = Send-NSPScanBridgeUploadSession -Path $job.FullName -DriveId ([string]$route.DriveId) -FolderItemId ([string]$route.FolderItemId) -Name $job.Name
                     if (-not $result.id -or [long]$result.size -ne [long]$job.Length) {
                         throw 'No matching remote upload acknowledgement.'
@@ -82,8 +104,15 @@ function Invoke-NSPScanBridge {
                     $target = Join-Path $archive $job.Name
                     if (Test-Path -LiteralPath $target) { throw 'Archive conflict.' }
                     [IO.File]::Move($job.FullName, $target)
+                    [IO.File]::Move($receiptPath, ([IO.Path]::ChangeExtension($target, '.json')))
                     [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'Delivered'; DriveItemId = [string]$result.id }
                 } catch {
+                    if (Test-Path -LiteralPath $job.FullName) {
+                        $current = Get-Content -LiteralPath $receiptPath -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+                        if ($current.State -eq 'Uploading') {
+                            Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Review
+                        }
+                    }
                     Write-Warning ("Delivery held for job {0}; inspect in protected environment." -f $jobId)
                     [pscustomobject]@{ Route = $route.Name; JobId = $jobId; State = 'PendingReviewOrRetry' }
                 }
