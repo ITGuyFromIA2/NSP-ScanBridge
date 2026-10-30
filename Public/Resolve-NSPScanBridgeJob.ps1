@@ -34,6 +34,10 @@ function Resolve-NSPScanBridgeJob {
     if ($receipt.JobId -ne $JobId -or $receipt.Hash -ne (Get-FileHash -LiteralPath $pdf -Algorithm SHA256).Hash) {
         throw 'Local PDF fails receipt integrity verification.'
     }
+    $context = Get-MgContext -ErrorAction Stop
+    if (-not $context -or [string]$context.AuthType -ne 'AppOnly') {
+        throw 'Reconciliation requires an app-only Microsoft Graph context.'
+    }
     $result = Test-NSPScanBridgeRemoteMatch -PdfPath $pdf -DriveId ([string]$route.DriveId) -FolderItemId ([string]$route.FolderItemId)
     if ($result.Status -ne 'Verified') {
         return [pscustomobject]@{ JobId=$JobId; Status=$result.Status; Archived=$false }
