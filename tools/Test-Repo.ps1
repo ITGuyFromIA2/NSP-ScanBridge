@@ -1,3 +1,4 @@
+& (Join-Path $PSScriptRoot 'Test-Parsing.ps1')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $manifest = Join-Path $root 'NSP.ScanBridge.psd1'
