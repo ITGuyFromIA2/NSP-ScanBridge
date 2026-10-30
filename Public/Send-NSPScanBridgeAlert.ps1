@@ -50,7 +50,7 @@ function Send-NSPScanBridgeAlert {
     $results += [pscustomobject]@{
         Route = 'Worker'
         Healthy = (-not $WorkerFailed)
-        Conditions = if ($WorkerFailed) { @('WorkerFailure') } else { @() }
+        Conditions = $(if ($WorkerFailed) { @('WorkerFailure') } else { @() })
         PendingCount = 0
         OldestPendingMinutes = $null
     }
