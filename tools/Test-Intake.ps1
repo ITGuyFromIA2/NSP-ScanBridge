@@ -32,6 +32,8 @@ try {
     if (Test-Path -LiteralPath $pdf) { throw 'Source was not moved to spool.' }
     $spoolFiles = @(Get-ChildItem -LiteralPath (Join-Path $testRoot 'spool') -Filter '*.pdf' -File)
     if ($spoolFiles.Count -ne 1 -or $spoolFiles[0].Name -cnotmatch '^[0-9a-f]{32}\.pdf$') { throw 'Opaque spool name missing.' }
+    $health = @(Get-NSPScanBridgeHealth -ConfigurationPath $configPath)
+    if ($health.Count -ne 1 -or $health[0].PendingCount -ne 1 -or $health[0].SourceCount -ne 0) { throw 'Health snapshot did not reflect the queued job.' }
     $again = @(Invoke-NSPScanBridge -ConfigurationPath $configPath -IntakeOnly)
     if ($again.Count -ne 0) { throw 'Second pass unexpectedly claimed another job.' }
     if (-not (Test-Path -LiteralPath $spoolFiles[0].FullName)) { throw 'Second pass lost the queued PDF.' }
