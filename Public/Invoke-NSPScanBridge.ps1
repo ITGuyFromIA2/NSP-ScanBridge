@@ -75,16 +75,7 @@ function Invoke-NSPScanBridge {
                         if ($null -eq $status -or [int]$status -ne 404) { throw }
                     }
                     if ($remote) { throw 'Remote file already exists; manual reconciliation required.' }
-                    $uploadArgs = @{
-                        Method = 'PUT'
-                        Uri = $baseUri + ':/content'
-                        InputFilePath = $job.FullName
-                        ContentType = 'application/pdf'
-                        Headers = @{ 'If-None-Match' = '*' }
-                        OutputType = 'PSObject'
-                        ErrorAction = 'Stop'
-                    }
-                    $result = Invoke-MgGraphRequest @uploadArgs
+                    $result = Send-NSPScanBridgeUploadSession -Path $job.FullName -DriveId ([string]$route.DriveId) -FolderItemId ([string]$route.FolderItemId) -Name $job.Name
                     if (-not $result.id -or [long]$result.size -ne [long]$job.Length) {
                         throw 'No matching remote upload acknowledgement.'
                     }
