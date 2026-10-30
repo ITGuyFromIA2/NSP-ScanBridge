@@ -6,6 +6,17 @@
     ClientId = '<app-guid>'
     CertificateThumbprint = '<thumbprint>'
   }
+  Alerts = @{
+    Enabled = $false
+    From = '<monitoring-mailbox@example.com>'
+    To = '<dispatch-address@example.com>'
+    StateDirectory = 'C:\ProgramData\NSP\ScanBridge\AlertState'
+    Auth = @{
+      TenantId = '<tenant-guid>'
+      ClientId = '<dedicated-mail-app-guid>'
+      CertificateThumbprint = '<monitoring-cert-thumbprint>'
+    }
+  }
   Routes = @(
     @{
       Name = 'RouteA'
