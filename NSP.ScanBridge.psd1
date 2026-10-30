@@ -6,7 +6,7 @@
  CompanyName = 'Network Systems Plus'
  Description = 'Unattended scanner to SharePoint ingestion.'
  PowerShellVersion = '5.1'
- FunctionsToExport = @('Get-NSPScanBridgeHealth', 'Invoke-NSPScanBridge', 'Test-NSPScanBridgeFileReady', 'Test-NSPScanBridgeHealth')
+ FunctionsToExport = @('Get-NSPScanBridgeHealth', 'Invoke-NSPScanBridge', 'Test-NSPScanBridgeFileReady', 'Test-NSPScanBridgeHealth', 'Send-NSPScanBridgeAlert')
  CmdletsToExport = @()
  VariablesToExport = @()
  AliasesToExport = @()
