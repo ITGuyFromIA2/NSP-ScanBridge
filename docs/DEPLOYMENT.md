@@ -27,3 +27,7 @@ The initial implementation still restricts files to 250 MB although it now uses 
 - Job state lives in a sibling JSON receipt beside the GUID-named PDF. Back up spool and receipts together, restrict folder ACLs, and never bulk-delete either.
 
 **Known recovery gap:** interruption between moving an uploaded PDF to Archive and moving its JSON receipt can leave an orphan receipt in Spool. No automated repair for orphan receipts exists yet. Include this in local integration tests.
+
+## Archive crash recovery update
+
+The worker now scans spool receipts for completed PDF moves whose receipt still remains in spool. It verifies that the receipt records a successful upload and validates the archived PDF's SHA-256 before moving the receipt to Archive. Conflicting or incomplete states remain held for human review; the worker does not reupload these files. A synthetic offline test exercises the interrupted move and an idempotent rerun. No automatic cloud-side reconciliation is implemented.
