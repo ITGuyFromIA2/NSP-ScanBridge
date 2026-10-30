@@ -26,6 +26,7 @@
       DriveId = '<drive-id>'
       FolderItemId = '<folder-id>'
       MinimumAgeSeconds = 20
+      VerifyRemoteAfterUpload = $false # Enable after synthetic tenant validation; downloads PDF again.
     }
   )
 }
