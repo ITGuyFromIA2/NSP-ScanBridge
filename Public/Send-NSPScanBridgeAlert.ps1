@@ -28,6 +28,10 @@ function Send-NSPScanBridgeAlert {
         throw 'Alert state directory must already exist.'
     }
     Import-Module NSP.M365.Graph -ErrorAction Stop
+    if (-not $alerts.Auth -or -not $alerts.Auth.TenantId -or -not $alerts.Auth.ClientId -or -not $alerts.Auth.CertificateThumbprint) {
+        throw 'Alerts.Auth requires a dedicated app-only mail identity.'
+    }
+    Connect-NSPGraphAppOnly -TenantId $alerts.Auth.TenantId -ClientId $alerts.Auth.ClientId -CertificateThumbprint $alerts.Auth.CertificateThumbprint | Out-Null
     foreach ($result in @(Test-NSPScanBridgeHealth -ConfigurationPath $ConfigurationPath -MaximumPending $MaximumPending -MaximumPendingMinutes $MaximumPendingMinutes)) {
         $routeId = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$result.Route))
         $routeId = $routeId.TrimEnd('=').Replace('+','-').Replace('/','_')
