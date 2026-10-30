@@ -68,3 +68,7 @@ The publication gate additionally checks full Git history; never check secrets o
 Each spooled PDF has a sibling `.json` receipt containing its opaque job ID, SHA-256, byte size, state, timestamp and (after success) remote drive-item ID. States are `Queued`, `Uploading`, `Uploaded` and `Review`. A completed remote upload is recorded before local archival. On restart, `Uploaded` jobs can resume archival without reuploading. An interrupted `Uploading` job is held for manual reconciliation, not silently replayed. Receipts are locally generated operational metadata: restrict their access and retention. This is a conservative first version; the operator-facing reconciliation command and automatic transient-error scheduling are still missing.
 
 The health command now separates Queued, Uploading, Uploaded-awaiting-archive, Review, missing/invalid receipts and orphan receipts. The worker no longer performs a racy remote GET before the documented conflict-fail upload session.
+
+## Operational checks
+
+`Get-NSPScanBridgeHealth -ConfigurationPath <private-config>` returns queue counts and age; `Test-NSPScanBridgeHealth -ConfigurationPath <private-config> -MaximumPending 25 -MaximumPendingMinutes 10` classifies unsafe queue conditions without outputting source filenames. Monitoring returns values; delivery to an email/SIEM alert channel is a separate integration. Bounded exponential retry calculation and safe-phase classification are implemented as private helpers but not wired into the worker yet. Ambiguous upload results remain held.
