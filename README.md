@@ -2,7 +2,7 @@
 
 Unattended scanner-to-SharePoint ingestion for Windows SMB drop folders.
 
-**Status:** Initial development scaffold. Not production-ready or HIPAA-certified. Do not route PHI through it until authentication, recovery, permissions, duplicate handling, and operational monitoring have been validated in the target tenant.
+**Status:** Development prototype with unattended intake and Graph upload code. Not production-ready or HIPAA-certified. Do not route PHI through it until authentication, recovery, permissions, duplicate handling, and operational monitoring have been validated in the target tenant.
 
 ## Dependencies
 
@@ -42,9 +42,20 @@ Publish-NSPModule -Path . -WhatIf
 
 The publication gate additionally checks full Git history; never check secrets or actual scans into this repository.
 
+## Current implementation
+
+- `Invoke-NSPScanBridge -ConfigurationPath <private-config>` performs one unattended pass: claim old, unlocked PDFs into a same-volume durable spool; attempt SharePoint Graph delivery; archive after acknowledgement.
+- `Invoke-NSPScanBridge -ConfigurationPath <private-config> -IntakeOnly` tests disk-only intake with no Graph connection.
+- `Test-NSPScanBridgeFileReady` excludes fresh, locked or empty PDFs.
+- `scripts/Run-ScanBridge.ps1` provides the scheduled-task entry point.
+- `tools/Test-Repo.ps1` includes offline intake persistence checks (not yet executed by this GitHub-only session).
+- See `docs/DEPLOYMENT.md` and `config/ScanBridge.example.psd1`.
+
+**Known gaps:** Graph conditional upload and 404 response handling need Windows/tenant validation; binary PDF upload depends on `Invoke-MgGraphRequest -InputFilePath` rather than the JSON-only shared wrapper; ambiguous remote responses require operator reconciliation; automated backoff/alerts and upload sessions remain to be implemented.
+
 ## Immediate next milestones
 
-1. Verify small-file binary upload using `Invoke-MgGraphRequest -InputFilePath` with the shared NSP.Graph connection.
+1. Verify the implemented small-file binary upload and overwrite safeguards using synthetic PDFs in a test library.
 2. Implement durable file claims / idempotent upload and archive reconciliation.
 3. Add permissions-limited tenant setup, health reporting and integration tests.
 4. Validate SYSTEM/LocalMachine certificate access on a test host.
