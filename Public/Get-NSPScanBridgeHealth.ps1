@@ -17,6 +17,29 @@ function Get-NSPScanBridgeHealth {
         $source = @(Get-ChildItem -LiteralPath $route.Source -File -Filter '*.pdf' -ErrorAction Stop)
         $pending = @(Get-ChildItem -LiteralPath $route.Spool -File -Filter '*.pdf' -ErrorAction Stop)
         $archive = @(Get-ChildItem -LiteralPath $route.Archive -File -Filter '*.pdf' -ErrorAction Stop)
+        $stateCounts = @{ Queued = 0; Uploading = 0; Uploaded = 0; Review = 0; MissingReceipt = 0; InvalidReceipt = 0 }
+        foreach ($file in $pending) {
+            $receiptPath = [IO.Path]::ChangeExtension($file.FullName, '.json')
+            if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
+                $stateCounts.MissingReceipt++
+                continue
+            }
+            try {
+                $receipt = Get-Content -LiteralPath $receiptPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                $state = [string]$receipt.State
+                if ($receipt.JobId -ne [IO.Path]::GetFileNameWithoutExtension($file.Name) -or -not $stateCounts.ContainsKey($state)) {
+                    $stateCounts.InvalidReceipt++
+                } else {
+                    $stateCounts[$state]++
+                }
+            } catch {
+                $stateCounts.InvalidReceipt++
+            }
+        }
+        $orphanReceipts = @(
+            Get-ChildItem -LiteralPath $route.Spool -File -Filter '*.json' -ErrorAction Stop |
+            Where-Object { -not (Test-Path -LiteralPath ([IO.Path]::ChangeExtension($_.FullName, '.pdf')) -PathType Leaf) }
+        ).Count
         $oldest = $null
         if ($pending.Count -gt 0) {
             $oldest = ($pending | Sort-Object CreationTimeUtc | Select-Object -First 1).CreationTimeUtc
@@ -26,6 +49,13 @@ function Get-NSPScanBridgeHealth {
             SourceCount = $source.Count
             PendingCount = $pending.Count
             ArchivedCount = $archive.Count
+            QueuedCount = $stateCounts.Queued
+            UploadingCount = $stateCounts.Uploading
+            UploadedAwaitingArchiveCount = $stateCounts.Uploaded
+            ReviewCount = $stateCounts.Review
+            MissingReceiptCount = $stateCounts.MissingReceipt
+            InvalidReceiptCount = $stateCounts.InvalidReceipt
+            OrphanReceiptCount = $orphanReceipts
             OldestPendingUtc = $oldest
             OldestPendingMinutes = if ($null -eq $oldest) { $null } else { [math]::Round(([datetime]::UtcNow - $oldest).TotalMinutes,1) }
         }
