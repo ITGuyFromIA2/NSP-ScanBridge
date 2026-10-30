@@ -16,6 +16,6 @@ try {
     if (@($results | Where-Object { -not $_.Healthy }).Count -gt 0) { exit 2 }
     exit 0
 } catch {
-    Write-Error 'ScanBridge health evaluation failed; inspect restricted local logs.'
+    Write-Error 'ScanBridge health evaluation failed; inspect restricted local logs.' -ErrorAction Continue
     exit 3
 }

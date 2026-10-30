@@ -1,53 +1,52 @@
 # Scanner ingestion deployment
 
-**Development status:** Not approved for PHI or production deployment. The upload path and Graph conditional-write semantics need live validation using synthetic PDFs.
+**Development only:** No production deployment or sensitive-document processing is approved by this guide. Offline results use synthetic fixtures and mocked transports; live Graph behavior remains unverified.
 
-1. Install NSP.ScanBridge, NSP.M365.Graph, and Microsoft.Graph.Authentication for the scheduled-task identity.
-2. Register an app-only Entra application with a protected machine certificate. Prefer Sites.Selected with access limited to the designated SharePoint site. Confirm tenant grants separately.
-3. Find the destination document-library DriveId and existing FolderItemId.
-4. Create dedicated source, spool, archive, and lock directories. Source and spool **must** be on the same drive. Restrict NTFS and share ACLs; ensure BitLocker is enabled.
-5. Copy config/ScanBridge.example.psd1 outside Git and set real values. Restrict ACLs on the configuration and certificate private key.
-6. Test intake locally with synthetic PDF files: Invoke-NSPScanBridge -ConfigurationPath '<private-config>' -IntakeOnly
-7. Test Graph upload in an isolated non-PHI library under the intended scheduled-task account.
-8. Schedule scripts/Run-ScanBridge.ps1 to run as SYSTEM whether or not a user is logged on, at startup and every minute; disable overlapping task instances.
-9. Monitor spool age and job results. Never automatically delete or replay ambiguous uploads. Keep old process recoverable until full cutover validation.
+## Prerequisites for a separately authorized synthetic test
 
-## Recovery and limitations
+1. Select an isolated SharePoint test library/folder, intended Windows account, app registration, certificate, and explicitly approved upload/readback/reconciliation actions. Record the exact destination and identity privately.
+2. Review current Microsoft documentation and tenant policy before selecting permissions. Validate the smallest approved site grant; do not infer effective access from local mocks. No app registrations, grants, package installation or certificate changes are performed by the test suite.
+3. Provide NSP.ScanBridge, NSP.M365.Graph and Microsoft.Graph.Authentication through a separately approved provisioning process. Verify certificate access under the actual unattended identity.
+4. Pre-create source, spool, archive, lock and optional alert-state directories. Restrict NTFS/share access, review encryption and retention, and verify sufficient disk space for spool-local remote readback. Source and spool must be on the same actual volume; lexical drive-root checks do not prove physical-volume identity or resolve junctions. Ensure configured directories/routes do not alias each other.
+5. Copy the example configuration outside Git. Supply complete `Auth.TenantId`, `Auth.ClientId`, and `Auth.CertificateThumbprint`. The worker connects and validates the active tenant/application. Reconciliation requires a previously connected, matching app-only context. Incomplete authentication fails closed.
+6. Use a synthetic PDF to test intake, then one upload with remote readback, an interrupted-upload reconciliation, and local archive recovery. Validate the conflict-fail policy against an existing synthetic destination item. Check that repeated passes do not upload acknowledged or held jobs again.
+7. Test optional alerts separately with an approved sender/recipient and restricted mail identity. Confirm actual ticket receipt independently of Graph acceptance.
+8. Only after separate approval, evaluate scheduling under the intended account, overlap prevention, external monitoring, recovery and rollback. The old scanner process remains recoverable until cutover is explicitly approved.
 
-Jobs receive opaque GUID names when claimed into the spool. A confirmed upload moves the source into Archive. Existing remote names and ambiguous responses are held for manual reconciliation and the spool item is retained. A power loss before archive may result in an intentionally held job, not automatic overwrite.
+The upload-session contract is reviewed against [Microsoft Graph createUploadSession documentation](https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession?view=graph-rest-1.0). This does not prove tenant permission, conflict or service behavior. No-overwrite behavior and unattended certificate access require live synthetic validation.
 
-The initial implementation still restricts files to 250 MB although it now uses conflict-fail upload sessions, and does not implement full receipts, backoff scheduling, content hash verification, Windows event logging, or alerting. Validate Microsoft Graph conflict behavior and failure handling before real use.
+## Receipt and archive recovery
 
-## Recovery workflow (development)
+- `Queued`: an upload may be attempted after receipt integrity checks.
+- `Uploading` or `Review`: never automatically replay. Use `Resolve-NSPScanBridgeJob` for explicit byte-verified remote reconciliation. A failed lookup is not proof of absence; unknown or mismatched remote content leaves the job held.
+- `Uploaded`: archive without uploading again. Persist the acknowledgement before moving the PDF, then move the receipt. A later pass verifies and recovers an orphan receipt after an interrupted PDF move.
+- Missing, invalid, changed or conflicting PDF/receipt state: retain both copies and require operator investigation. A missing receipt is not enough evidence to recreate a `Queued` job. Reconciliation requires an intact matching receipt; missing-receipt remediation needs protected external evidence and an operator decision.
 
-- `Queued`: safe to attempt upload in the next pass.
-- `Uploading`: an interruption means the remote outcome may be unknown; subsequent passes leave the PDF in place for operator review.
-- `Review`: manual investigation required; do not flip back to Queued unless the remote outcome has been independently verified.
-- `Uploaded`: remote acknowledgment was obtained and persisted; archive locally without another upload.
-- Job state lives in a sibling JSON receipt beside the GUID-named PDF. Back up spool and receipts together, restrict folder ACLs, and never bulk-delete either.
+Receipt validation checks version 2, immutable destination binding, job ID, legal state, size, SHA-256 and the remote ID for `Uploaded`. Already-archived pairs are revalidated when archive recovery is requested. These checks detect inconsistency; they do not authenticate receipts against a malicious writer. Directory ACLs remain essential.
 
-**Known recovery gap:** interruption between moving an uploaded PDF to Archive and moving its JSON receipt can leave an orphan receipt in Spool. No automated repair for orphan receipts exists yet. Include this in local integration tests.
+Optional `VerifyRemoteAfterUpload = $true` downloads the remote PDF again and compares SHA-256 and remote item ID before marking the receipt `Uploaded`. It increases disk/network load and may hold a job if a newly uploaded item is not yet readable. Readback temporaries are spool-local and removed on normal completion; abrupt process termination can leave files needing protected operator review. Do not bulk-delete spool evidence.
 
-## Archive crash recovery update
+## Monitoring and runner exits
 
-The worker now scans spool receipts for completed PDF moves whose receipt still remains in spool. It verifies that the receipt records a successful upload and validates the archived PDF's SHA-256 before moving the receipt to Archive. Conflicting or incomplete states remain held for human review; the worker does not reupload these files. A synthetic offline test exercises the interrupted move and an idempotent rerun. No automatic cloud-side reconciliation is implemented.
+Run `scripts/Test-ScanBridgeHealth.ps1` only under an approved local monitoring identity. It reports generic route, condition codes, queue count and age. Pending receipt validation hashes local PDFs; plan polling frequency and disk access accordingly.
 
-Health reporting now surfaces held/review and invalid/orphan receipt counts, not just total pending files. A racy remote GET preflight was removed; conflict handling is delegated to the Graph upload-session fail policy, subject to live validation.
+| Runner | 0 | 2 | 3 |
+| --- | --- | --- | --- |
+| `Run-ScanBridge.ps1` | Pass completed without reported held jobs | Worker exception or held job | Alert evaluation/submission failed |
+| `Test-ScanBridgeHealth.ps1` | Healthy | Queue/review/receipt condition | Health check could not complete |
+| `Send-ScanBridgeAlerts.ps1` | Evaluation/submission completed | Unused | Alert evaluation/submission failed |
 
-## Monitoring
+An alert runner exit of zero does not prove a ticket exists. Unknown spool entries and orphan receipts still require health monitoring even if the ingestion pass has no deliverable jobs. External RMM checks must detect host/scheduler/authentication failure. Generic warnings do not create a protected diagnostic log automatically; operators must define restricted diagnostics and retention separately.
 
-Run `Test-NSPScanBridgeHealth -ConfigurationPath <private-config> -MaximumPending 25 -MaximumPendingMinutes 10` as a read-only health check. Inspect `Healthy` and `Conditions`; do not record PDF names or content in central monitoring. This currently evaluates local state only and does not send alerts. Automatic transient retry policy is not wired into the worker, to avoid replaying ambiguous upload sessions without cloud reconciliation.
+Run the two-host manual suite in the README before any approved deployment. No GitHub Actions, package publication, tenant testing or production installation is implied by these instructions.
+## Route isolation and spool anomalies
 
-## RMM check
+The worker validates the complete route set before opening its lock, connecting to Graph, or claiming/processing documents. Route names must be unique. All source, spool and archive directories must be distinct and non-nested across every route; sharing a spool or archive between routes is rejected. This is lexical path validation; operators must still verify actual volumes, junctions and other aliases during deployment.
 
-Run `scripts/Test-ScanBridgeHealth.ps1 -ConfigurationPath <private-config>` under an authorized local monitoring identity. Exit codes: `0` healthy; `2` queue thresholds or review conditions exceeded; `3` check could not complete. Output includes route name, counts and age only, not document filenames. Keep route names generic and configure the RMM to alert on nonzero exit codes.
+A receipt whose PDF exists in neither spool nor archive produces a held result and remains unchanged. Unknown PDF or JSON names also produce generic held results without exposing their names. The ingestion runner returns 2 for those results even when alerts are disabled or skipped. Interrupted-archive recovery remains available for valid GUID receipts with matching archived PDFs.
 
-## Held-job verification
+Version 2 receipts bind each job to its original route name, tenant ID, application ID, drive ID and folder item ID when it is claimed. Every worker state change, upload, explicit reconciliation and archive recovery checks the configured destination against that stored binding. A changed binding holds the document and receipt unchanged. Health reports it as a receipt anomaly. Returning configuration to the original binding allows normal processing/recovery; it never resets an ambiguous upload to Queued. Values compare exactly, so changing identifier spelling/case or renaming a route can also require operator review. Certificate thumbprints are not bound, allowing certificate rotation for the same application and destination.
 
-Use Resolve-NSPScanBridgeJob with an opaque JobId, RouteName, and the private ConfigurationPath. It reads the remote PDF, compares SHA-256, and only archives a confirmed exact match. Reconciliation holds the same worker lock. Keep spool access restricted and confirm sufficient free space. Unknown or mismatched remote copies remain held. Integration testing is required before operational use.
+Even `-IntakeOnly` requires expected tenant/app and destination metadata to create a bound receipt; it makes no Graph connection. Receipt metadata now includes private deployment identifiers and belongs only in restricted spool/archive storage, not central monitoring, public examples or ticket bodies.
 
-Run tools/Test-Repo.ps1 locally before deployment; it now parses every PowerShell source/test/runner file before executing tests. The held-job recovery command requires an app-only Graph context and uses a spool-local temporary download for complete SHA-256 comparison.
-
-## Post-upload readback
-
-After testing with a synthetic document, a route may set VerifyRemoteAfterUpload = $true. The worker then reads remote bytes and checks SHA-256 and remote item ID before archiving. Readback uses restricted spool storage and can increase latency or hold a file if SharePoint has not yet made it readable.
+Legacy version 1 receipts lack destination provenance. They remain untouched and held regardless of their recorded state, including Uploaded. Neither the worker, writer nor reconciler silently upgrades or rebinds them. Preserve these documents/receipts and establish original destination identity from protected records before a separately reviewed per-job migration/recovery plan. There is no automatic migration/rebind command; do not bulk relabel or replay legacy jobs. These consistency checks still depend on ACLs and do not authenticate a receipt against a malicious writer.

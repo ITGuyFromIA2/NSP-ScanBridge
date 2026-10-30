@@ -12,6 +12,7 @@ try {
     $safeRoot = $testRoot.Replace("'", "''")
     $configText = @"
 @{
+ Auth = @{ TenantId='test-tenant'; ClientId='test-app'; CertificateThumbprint='test-cert' }
  LockPath = '$safeRoot\lock\worker.lock'
  Routes = @(
   @{

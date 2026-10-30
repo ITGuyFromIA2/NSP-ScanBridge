@@ -2,87 +2,50 @@
 
 Unattended scanner-to-SharePoint ingestion for Windows SMB drop folders.
 
-**Status:** Development prototype with unattended intake and Graph upload code. Not production-ready or HIPAA-certified. Do not route PHI through it until authentication, recovery, permissions, duplicate handling, and operational monitoring have been validated in the target tenant.
+**Status:** Development version 0.1.0. Synthetic offline tests do not establish production readiness, tenant compatibility, or approval to process sensitive documents.
+
+The scanner retains its SMB drop workflow. ScanBridge claims stable PDFs into a durable spool using opaque GUID names, sends binary chunks through Graph upload sessions, persists delivery receipts, and archives acknowledged documents. It runs without an interactive OneDrive session. Implementation stays in this repository; shared authentication and JSON transport belong to NSP.M365.Graph.
 
 ## Dependencies
 
-- Windows PowerShell 5.1 or PowerShell 7
-- NSP.M365.Graph (app-only sign-in via `Connect-NSPGraphAppOnly`)
-- Microsoft.Graph.Authentication
-- NSP.Bootstrap for provisioning/deployment
-- NSP.RepoTools for release and client-reference sweeps
+- Windows PowerShell 5.1 or PowerShell 7 on Windows.
+- NSP.M365.Graph and Microsoft.Graph.Authentication for authorized tenant operations.
+- NSP.Bootstrap for separately approved provisioning; runtime tests install nothing.
+- NSP.RepoTools for privacy and release review.
 
-## Planned flow
+## Local development checks
 
-Brother MFP -> dedicated SMB drop folder -> unattended scheduled task -> Microsoft Graph -> Teams-backed SharePoint library.
+Run each command in a fresh process from the source root:
 
-The Teams channel remains a user-facing view; no mailbox or Power Automate flow is required.
+```powershell
+powershell.exe -NoProfile -File .\tools\Test-Parsing.ps1
+powershell.exe -NoProfile -File .\tools\Test-Repo.ps1
+pwsh.exe -NoProfile -File .\tools\Test-Parsing.ps1
+pwsh.exe -NoProfile -File .\tools\Test-Repo.ps1
+```
 
-## Design principles
+The suite validates manifest/import/exports, file readiness, intake, receipts, archive recovery, upload contracts and failures, readback reconciliation, identity checks, enabled fake-mail alerting, and runner exit codes. Fixtures use synthetic bytes and mocked transports. Runner tests load an isolated fake module in child processes. There is no GitHub Actions workflow. PSScriptAnalyzer is optional and is not installed by these commands.
 
-- Run without an interactive user or OneDrive sign-in.
-- Read only fully written PDFs; periodically reconcile in addition to optional watcher events.
-- Retain originals until confirmed remote delivery.
-- Persist queue/checkpoint state and recover from interruptions.
-- Restrict Graph app permissions to selected sites when feasible.
-- Keep credentials, patient data, client names, URLs and tenant IDs out of source control.
-- Separate generic module code from deployment-specific configuration.
-- Avoid PHI-bearing filenames in ordinary diagnostics.
-
-## Development workflow
-
-Use `NSP.RepoTools` before public commits/releases:
+Before public delivery, run the local privacy gate with an available, nonempty private token list:
 
 ```powershell
 Import-Module NSP.RepoTools
-Find-NSPClientReference -Path . -IncludeUntracked
-.\tools\Test-Repo.ps1
-Publish-NSPModule -Path . -WhatIf
+Find-NSPClientReference -Path . -IncludeUntracked -History
 ```
 
-The publication gate additionally checks full Git history; never check secrets or actual scans into this repository.
+Inspect results privately: do not print matched client text into shared logs. A clean current snapshot does not clear historical findings. Commit, push, PR, package publication, and tenant tests require their applicable owner approvals.
 
-## Current implementation
+## Commands and recovery
 
-- `Invoke-NSPScanBridge -ConfigurationPath <private-config>` performs one unattended pass: claim old, unlocked PDFs into a same-volume durable spool; attempt SharePoint Graph delivery; archive after acknowledgement.
-- `Invoke-NSPScanBridge -ConfigurationPath <private-config> -IntakeOnly` tests disk-only intake with no Graph connection.
-- `Test-NSPScanBridgeFileReady` excludes fresh, locked or empty PDFs.
-- `scripts/Run-ScanBridge.ps1` provides the scheduled-task entry point.
-- `tools/Test-Repo.ps1` includes offline intake persistence checks (not yet executed by this GitHub-only session).
-- See `docs/DEPLOYMENT.md` and `config/ScanBridge.example.psd1`.
+- `Invoke-NSPScanBridge -ConfigurationPath <private-config>` performs one intake/delivery pass. Complete expected app-only authentication is required; the active tenant and application must match it.
+- `Invoke-NSPScanBridge ... -IntakeOnly` uses local disk only. Configure expected tenant/app and destination metadata even in this mode so new receipts are bound from intake; no Graph login occurs. Only use approved synthetic fixtures during development.
+- `Get-NSPScanBridgeHealth` reports counts and pending age. It validates pending receipt metadata and SHA-256, so its disk cost grows with the spool.
+- `Test-NSPScanBridgeHealth` reports queue thresholds, held uploads and receipt anomalies.
+- `Resolve-NSPScanBridgeJob ... -RouteName RouteA -JobId <opaque-guid>` accepts both `Uploading` and `Review` jobs. It requires an existing context matching the configured ingestion identity, downloads remote bytes into restricted spool storage, compares exact SHA-256, then archives only a match. It never replays an upload. `-WhatIf` still performs readback but skips receipt/archive changes.
+- `Send-NSPScanBridgeAlert` uses a separately configured app-only mail identity and persistent, serialized alert markers. See [alerting](docs/ALERTING.md).
 
-**Known gaps:** Graph conditional upload and 404 response handling need Windows/tenant validation; binary upload uses a Graph-created preauthenticated upload session and `Invoke-RestMethod` chunk PUTs without authorization headers; ambiguous remote responses require operator reconciliation; automated backoff/alerts and upload sessions remain to be implemented.
+Version 2 receipts contain an immutable destination binding (route name, tenant ID, app ID, drive ID and folder item ID), opaque job ID, SHA-256, size, state, timestamp and acknowledged remote ID. Upload, reconciliation and archive recovery reject mismatches. Certificate changes with the same identity/destination do not alter the binding. `Queued` permits an upload attempt; `Uploading` and `Review` remain held until explicit reconciliation; `Uploaded` permits archive recovery without reupload. Missing, corrupt or inconsistent receipts are preserved for review and never recreated automatically. Legacy version 1 receipts are unbound and remain held; there is no automatic migration or rebinding. Back up PDFs and receipts together, and restrict access because destination metadata includes private deployment identifiers.
 
-## Immediate next milestones
+Session creation retries recognized transient HTTP failures at most three times before binary transfer. Binary transfer is sequential, uses 320 KiB-multiple chunks, and checks the next expected position and final item ID/size. An ambiguous transfer is held. Optional `VerifyRemoteAfterUpload` adds full remote readback before acknowledgement. The development per-file limit remains 250 MB.
 
-1. Verify upload-session conflict behavior and upload acknowledgement using synthetic PDFs in a test library.
-2. Implement durable file claims / idempotent upload and archive reconciliation.
-3. Add permissions-limited tenant setup, health reporting and integration tests.
-4. Validate SYSTEM/LocalMachine certificate access on a test host.
-
-**Repository:** `ITGuyFromIA2/NSP-ScanBridge`  
-**PowerShell module:** `NSP.ScanBridge`
-
-## Crash recovery and receipts
-
-Each spooled PDF has a sibling `.json` receipt containing its opaque job ID, SHA-256, byte size, state, timestamp and (after success) remote drive-item ID. States are `Queued`, `Uploading`, `Uploaded` and `Review`. A completed remote upload is recorded before local archival. On restart, `Uploaded` jobs can resume archival without reuploading. An interrupted `Uploading` job is held for manual reconciliation, not silently replayed. Receipts are locally generated operational metadata: restrict their access and retention. This is a conservative first version; the operator-facing reconciliation command and automatic transient-error scheduling are still missing.
-
-The health command now separates Queued, Uploading, Uploaded-awaiting-archive, Review, missing/invalid receipts and orphan receipts. The worker no longer performs a racy remote GET before the documented conflict-fail upload session.
-
-## Operational checks
-
-`Get-NSPScanBridgeHealth -ConfigurationPath <private-config>` returns queue counts and age; `Test-NSPScanBridgeHealth -ConfigurationPath <private-config> -MaximumPending 25 -MaximumPendingMinutes 10` classifies unsafe queue conditions without outputting source filenames. Monitoring returns values; delivery to an email/SIEM alert channel is a separate integration. Bounded exponential retry calculation and safe-phase classification are implemented as private helpers but not wired into the worker yet. Ambiguous upload results remain held.
-
-## Dispatch escalation
-
-Optional `Send-NSPScanBridgeAlert` and `scripts/Send-ScanBridgeAlerts.ps1` provide deduplicated, PHI-minimizing email escalation for unresolved queue/review conditions. Sending uses `NSP.M365.Graph` with a separate restricted app-only Mail.Send identity, and is disabled by default. Set the approved dispatch recipient only in private deployment configuration. See `docs/ALERTING.md` for permissions, monitoring and failure semantics.
-
-The unattended runner now invokes dispatch evaluation even when the ingestion worker throws, and the escalation handler emits generic WorkerFailure or HealthCheckFailed conditions rather than including sensitive exception messages. A synthetic two-chunk Graph upload test checks sequential byte ranges and final acknowledgement. These are source/test changes only; Windows and tenant integration remain outstanding.
-
-The upload-session creation step now retries up to three times for recognized transient HTTP statuses, using bounded exponential backoff, before any file bytes are sent. Once a session has been created or a transfer may have begun, ambiguous failures remain held for review. The offline session-retry test uses a synthetic throttling response; real Graph behavior remains to be validated.
-
-### Remote reconciliation
-
-A held job can be checked with `Resolve-NSPScanBridgeJob -ConfigurationPath <private-config> -RouteName RouteA -JobId <opaque-guid>`. The operator command requires an existing app-only Graph connection and serializes with the main worker lock. It reads the SharePoint document bytes into a disposable file **inside the restricted spool** and only marks the job `Uploaded` when local receipt SHA-256 and remote SHA-256 match. Missing, inaccessible or mismatched remote content is never accepted; no upload replay occurs. This is a deliberate opt-in recovery action, not automatic background reconciliation. Run with `-WhatIf` before use and validate against synthetic files.
-
-Optional VerifyRemoteAfterUpload route setting performs a remote PDF readback and SHA-256 comparison before archival. Leave it disabled until verified with synthetic files in the test site. It increases bandwidth and can hold a job if SharePoint has not made the new item readable yet.
+See [deployment and evidence limits](docs/DEPLOYMENT.md) and the placeholder-only [configuration](config/ScanBridge.example.psd1). Real configuration, document content, filenames, addresses, tenant identifiers and credentials stay outside Git.

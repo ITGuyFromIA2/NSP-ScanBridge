@@ -2,17 +2,19 @@ function Save-NSPScanBridgeReceipt {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$PdfPath,
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Binding,
         [Parameter(Mandatory)][ValidateSet('Queued','Uploading','Uploaded','Review')][string]$State,
         [string]$RemoteId,
         [switch]$VerifiedReconciliation
     )
+    Assert-NSPScanBridgeJobBinding -Binding $Binding
     $pdf = Get-Item -LiteralPath $PdfPath -ErrorAction Stop
     $id = [IO.Path]::GetFileNameWithoutExtension($pdf.Name)
     if ($id -notmatch '^[0-9a-f]{32}$') { throw 'Invalid job ID.' }
     $receiptPath = [IO.Path]::ChangeExtension($pdf.FullName, '.json')
     $previous = $null
     if (Test-Path -LiteralPath $receiptPath) {
-        $previous = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+        $previous = Read-NSPScanBridgeReceipt -PdfPath $pdf.FullName -ReceiptPath $receiptPath -ExpectedBinding $Binding
     }
     $hash = (Get-FileHash -LiteralPath $pdf.FullName -Algorithm SHA256).Hash
     if ($previous -and ($previous.JobId -ne $id -or $previous.Hash -ne $hash)) {
@@ -36,7 +38,8 @@ function Save-NSPScanBridgeReceipt {
         throw 'Uploaded state requires remote item ID.'
     }
     $receipt = @{
-        Version = 1
+        Version = 2
+        Destination = $Binding
         JobId = $id
         State = $State
         Hash = $hash
@@ -46,9 +49,9 @@ function Save-NSPScanBridgeReceipt {
     }
     $temp = $receiptPath + '.new'
     try {
-        [IO.File]::WriteAllText($temp, ($receipt | ConvertTo-Json -Compress))
+        [IO.File]::WriteAllText($temp, ($receipt | ConvertTo-Json -Depth 5 -Compress))
         if (Test-Path -LiteralPath $receiptPath) {
-            [IO.File]::Replace($temp, $receiptPath, $null)
+            [IO.File]::Replace($temp, $receiptPath, [NullString]::Value)
         } else {
             [IO.File]::Move($temp, $receiptPath)
         }

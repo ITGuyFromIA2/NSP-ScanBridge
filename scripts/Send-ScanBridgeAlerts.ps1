@@ -5,10 +5,10 @@ param(
   [int]$MaximumPendingMinutes = 10
 )
 $ErrorActionPreference = 'Stop'
-Import-Module NSP.ScanBridge -ErrorAction Stop
 try {
+  Import-Module NSP.ScanBridge -ErrorAction Stop
   Send-NSPScanBridgeAlert -ConfigurationPath $ConfigurationPath -MaximumPending $MaximumPending -MaximumPendingMinutes $MaximumPendingMinutes -ErrorAction Stop
 } catch {
-  Write-Error 'ScanBridge escalation failed; check the restricted monitoring logs.'
+  Write-Error 'ScanBridge escalation failed; check the restricted monitoring logs.' -ErrorAction Continue
   exit 3
 }

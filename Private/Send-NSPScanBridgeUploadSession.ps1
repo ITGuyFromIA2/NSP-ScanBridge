@@ -54,8 +54,16 @@ function Send-NSPScanBridgeUploadSession {
             $args = @{ Method = 'PUT'; Uri = $session.uploadUrl; Body = $bytes; ContentType = 'application/octet-stream'; Headers = $headers; ErrorAction = 'Stop' }
             $response = Invoke-RestMethod @args
             $position += $count
-            if ($position -lt $stream.Length -and -not $response.nextExpectedRanges) {
-                throw 'Graph did not acknowledge next expected range.'
+            if ($position -lt $stream.Length) {
+                $ranges = @($response.nextExpectedRanges)
+                # This worker does not resume or replay chunks. Hold any unexpected range.
+                if ($ranges.Count -ne 1 -or [string]$ranges[0] -notmatch ('^' + $position + '-(?:[0-9]+)?$')) {
+                    throw 'Graph did not acknowledge the sequential upload position.'
+                }
+                if ([string]$ranges[0] -match '-([0-9]+)$' -and
+                    ([decimal]$Matches[1] -lt $position -or [decimal]$Matches[1] -ge $stream.Length)) {
+                    throw 'Graph returned an invalid remaining byte range.'
+                }
             }
         }
         if (-not $response.id -or [long]$response.size -ne $stream.Length) {

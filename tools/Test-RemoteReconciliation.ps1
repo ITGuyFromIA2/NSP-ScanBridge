@@ -7,7 +7,7 @@ function Invoke-NSPGraphRequest {
     return @{ id='test-remote-id'; size=8; '@microsoft.graph.downloadUrl'='https://example.invalid/content' }
 }
 function Invoke-WebRequest {
-    param($Uri,$OutFile,$UseBasicParsing,$ErrorAction)
+    param($Uri,$OutFile,[switch]$UseBasicParsing,$ErrorAction)
     [IO.File]::WriteAllBytes($OutFile,$script:remoteBytes)
 }
 $dir = Join-Path ([IO.Path]::GetTempPath()) ('NSPReconcile-' + [guid]::NewGuid().ToString('N'))

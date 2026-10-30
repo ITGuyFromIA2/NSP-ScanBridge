@@ -2,7 +2,8 @@ function Complete-NSPScanBridgeArchive {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$PdfPath,
-        [Parameter(Mandatory)][string]$ArchiveDirectory
+        [Parameter(Mandatory)][string]$ArchiveDirectory,
+        [Parameter(Mandatory)][System.Collections.IDictionary]$ExpectedBinding
     )
     $name = [IO.Path]::GetFileName($PdfPath)
     $id = [IO.Path]::GetFileNameWithoutExtension($name)
@@ -20,9 +21,12 @@ function Complete-NSPScanBridgeArchive {
     if (Test-Path -LiteralPath $targetReceipt) {
         if (Test-Path -LiteralPath $sourceReceipt) { throw 'Duplicate receipts require manual review.' }
         if ($pdfInSpool) { throw 'Archived receipt with spooled PDF requires manual review.' }
+        $archivedReceipt = Read-NSPScanBridgeReceipt -PdfPath $targetPdf -ReceiptPath $targetReceipt -ExpectedBinding $ExpectedBinding
+        if ($archivedReceipt.State -ne 'Uploaded') { throw 'Archived receipt has no verified uploaded state.' }
         return
     }
-    $receipt = Get-Content -LiteralPath $sourceReceipt -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+    $actualPdf = if ($pdfInSpool) { $PdfPath } else { $targetPdf }
+    $receipt = Read-NSPScanBridgeReceipt -PdfPath $actualPdf -ReceiptPath $sourceReceipt -ExpectedBinding $ExpectedBinding
     if ($receipt.JobId -ne $id -or $receipt.State -ne 'Uploaded' -or -not $receipt.RemoteId) {
         throw 'Receipt has no verified uploaded state.'
     }

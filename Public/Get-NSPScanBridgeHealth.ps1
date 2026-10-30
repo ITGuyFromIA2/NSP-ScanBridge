@@ -25,9 +25,10 @@ function Get-NSPScanBridgeHealth {
                 continue
             }
             try {
-                $receipt = Get-Content -LiteralPath $receiptPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                $binding = Get-NSPScanBridgeJobBinding -Route $route -Auth $config.Auth
+                $receipt = Read-NSPScanBridgeReceipt -PdfPath $file.FullName -ReceiptPath $receiptPath -ExpectedBinding $binding
                 $state = [string]$receipt.State
-                if ($receipt.JobId -ne [IO.Path]::GetFileNameWithoutExtension($file.Name) -or -not $stateCounts.ContainsKey($state)) {
+                if ($receipt.JobId -ne [IO.Path]::GetFileNameWithoutExtension($file.Name) -or $state -notin @('Queued','Uploading','Uploaded','Review')) {
                     $stateCounts.InvalidReceipt++
                 } else {
                     $stateCounts[$state]++

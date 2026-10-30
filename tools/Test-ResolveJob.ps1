@@ -1,18 +1,23 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+$testBinding = @{ RouteName='Test'; TenantId='test-tenant'; ClientId='test-app'; DriveId='drive'; FolderItemId='folder' }
+. (Join-Path $root 'Private/Assert-NSPScanBridgeJobBinding.ps1')
+. (Join-Path $root 'Private/Get-NSPScanBridgeJobBinding.ps1')
+. (Join-Path $root 'Private/Read-NSPScanBridgeReceipt.ps1')
+. (Join-Path $root 'Private/Assert-NSPScanBridgeContext.ps1')
 foreach ($file in @('Save-NSPScanBridgeReceipt.ps1','Complete-NSPScanBridgeArchive.ps1','Test-NSPScanBridgeRemoteMatch.ps1')) {
     . (Join-Path (Join-Path $root 'Private') $file)
 }
 . (Join-Path $root 'Public/Resolve-NSPScanBridgeJob.ps1')
 $script:remoteBytes = [byte[]](37,80,68,70,45,49,46,52)
 $script:authType = 'AppOnly'
-function Get-MgContext { param($ErrorAction) return @{ AuthType = $script:authType } }
+function Get-MgContext { param($ErrorAction) return @{ AuthType = $script:authType; TenantId = 'test-tenant'; ClientId = 'test-app' } }
 function Invoke-NSPGraphRequest {
     param($Method,$Uri,$ErrorAction)
     return @{ id='remote-confirmed'; size=8; '@microsoft.graph.downloadUrl'='https://example.invalid/file' }
 }
 function Invoke-WebRequest {
-    param($Uri,$OutFile,$UseBasicParsing,$ErrorAction)
+    param($Uri,$OutFile,[switch]$UseBasicParsing,$ErrorAction)
     [IO.File]::WriteAllBytes($OutFile,$script:remoteBytes)
 }
 $base = Join-Path ([IO.Path]::GetTempPath()) ('nsp-reconcile-endtoend-' + [guid]::NewGuid().ToString('N'))
@@ -21,11 +26,11 @@ try {
     $id = [guid]::NewGuid().ToString('N')
     $pdf = Join-Path $base ('spool\' + $id + '.pdf')
     [IO.File]::WriteAllBytes($pdf,[byte[]](37,80,68,70,45,49,46,52))
-    Save-NSPScanBridgeReceipt -PdfPath $pdf -State Queued
-    Save-NSPScanBridgeReceipt -PdfPath $pdf -State Review
+    Save-NSPScanBridgeReceipt -Binding $testBinding -PdfPath $pdf -State Queued
+    Save-NSPScanBridgeReceipt -Binding $testBinding -PdfPath $pdf -State Review
     $safeBase = $base.Replace("'", "''")
     $config = Join-Path $base 'config.psd1'
-    $text = "@{ LockPath = '$safeBase\lock\worker.lock'; Routes = @( @{ Name = 'Test'; Spool = '$safeBase\spool'; Archive = '$safeBase\archive'; DriveId = 'drive'; FolderItemId = 'folder' } ) }"
+    $text = "@{ Auth = @{ TenantId = 'test-tenant'; ClientId = 'test-app'; CertificateThumbprint = 'test-cert' }; LockPath = '$safeBase\lock\worker.lock'; Routes = @( @{ Name = 'Test'; Spool = '$safeBase\spool'; Archive = '$safeBase\archive'; DriveId = 'drive'; FolderItemId = 'folder' } ) }"
     [IO.File]::WriteAllText($config,$text)
     $script:authType = 'Delegated'
     $denied = $false

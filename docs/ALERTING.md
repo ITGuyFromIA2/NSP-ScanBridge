@@ -13,3 +13,11 @@ A Graph-accepted send is not confirmation that a ticket was opened. A crash afte
 **Status:** Development-only. Run offline tests and then synthetic live mail tests before using for production incidents.
 
 The scheduled ingestion runner calls alert evaluation even after a worker exception. Its WorkerFailure incident remains active until a subsequent successful worker pass; HealthCheckFailed covers unreadable/incomplete queue health. These alerts are not independent of the host: a powered-off machine, broken scheduler, or failed authentication still requires external RMM monitoring. A Graph-accepted email is not a verified dispatch ticket.
+
+## Stabilized local behavior
+
+Alert evaluation holds an exclusive `alerts.lock` file in the configured state directory through health evaluation, sending and marker persistence. A concurrent alert process fails closed. Successful health evaluation resolves the `HealthCheckFailed` marker so a later failure can alert again. Marker replacement uses a true null backup filename in both PowerShell hosts.
+
+Only a caller explicitly reporting `-WorkerSucceeded` resolves an earlier `WorkerFailure`; the ingestion runner supplies this after a pass without an exception. Standalone alert evaluation does not imply worker success. `-WorkerFailed` and `-WorkerSucceeded` are mutually exclusive. Configure unique generic route names; `System` and `Worker` are reserved internal incident names.
+
+`-WhatIf` skips authentication, mail sending and marker updates, but may create/open the serialization lock and read local health. A send failure leaves the incident unmarked. A marker persistence failure is reported, releases the lock and permits retry, which can duplicate a previously accepted message. Exactly-once mail delivery is not guaranteed. Enabled offline tests use fake authentication and mail transports; no real mail is sent.

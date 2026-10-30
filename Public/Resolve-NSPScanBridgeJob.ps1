@@ -23,28 +23,25 @@ function Resolve-NSPScanBridgeJob {
     $routes = @($config.Routes | Where-Object { $_.Name -eq $RouteName })
     if ($routes.Count -ne 1) { throw 'Route must match exactly one configured entry.' }
     $route = $routes[0]
+    $binding = Get-NSPScanBridgeJobBinding -Route $route -Auth $config.Auth
     $pdf = Join-Path $route.Spool ($JobId + '.pdf')
     $receiptPath = [IO.Path]::ChangeExtension($pdf, '.json')
     if (-not (Test-Path -LiteralPath $pdf -PathType Leaf) -or -not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
         throw 'Held PDF and receipt must both exist.'
     }
-    $receipt = Get-Content -LiteralPath $receiptPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+    $receipt = Read-NSPScanBridgeReceipt -PdfPath $pdf -ReceiptPath $receiptPath -ExpectedBinding $binding
     if ($receipt.State -notin @('Review','Uploading')) { throw 'Job is not awaiting upload reconciliation.' }
-    if ($receipt.State -eq 'Uploading') { throw 'Run worker first to classify interrupted Uploading state.' }
     if ($receipt.JobId -ne $JobId -or $receipt.Hash -ne (Get-FileHash -LiteralPath $pdf -Algorithm SHA256).Hash) {
         throw 'Local PDF fails receipt integrity verification.'
     }
-    $context = Get-MgContext -ErrorAction Stop
-    if (-not $context -or [string]$context.AuthType -ne 'AppOnly') {
-        throw 'Reconciliation requires an app-only Microsoft Graph context.'
-    }
+    Assert-NSPScanBridgeContext -Auth $config.Auth
     $result = Test-NSPScanBridgeRemoteMatch -PdfPath $pdf -DriveId ([string]$route.DriveId) -FolderItemId ([string]$route.FolderItemId)
     if ($result.Status -ne 'Verified') {
         return [pscustomobject]@{ JobId=$JobId; Status=$result.Status; Archived=$false }
     }
     if ($PSCmdlet.ShouldProcess($JobId,'Record verified remote copy and archive local PDF')) {
-        Save-NSPScanBridgeReceipt -PdfPath $pdf -State Uploaded -RemoteId $result.RemoteId -VerifiedReconciliation
-        Complete-NSPScanBridgeArchive -PdfPath $pdf -ArchiveDirectory $route.Archive
+        Save-NSPScanBridgeReceipt -PdfPath $pdf -State Uploaded -RemoteId $result.RemoteId -VerifiedReconciliation -Binding $binding
+        Complete-NSPScanBridgeArchive -PdfPath $pdf -ArchiveDirectory $route.Archive -ExpectedBinding $binding
         return [pscustomobject]@{ JobId=$JobId; Status='Verified'; Archived=$true }
     }
     } finally { $lock.Dispose() }

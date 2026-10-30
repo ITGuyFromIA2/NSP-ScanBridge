@@ -1,5 +1,5 @@
-& (Join-Path $PSScriptRoot 'Test-Parsing.ps1')
 $ErrorActionPreference = 'Stop'
+& (Join-Path $PSScriptRoot 'Test-Parsing.ps1')
 $root = Split-Path -Parent $PSScriptRoot
 $manifest = Join-Path $root 'NSP.ScanBridge.psd1'
 $moduleInfo = Test-ModuleManifest -Path $manifest -ErrorAction Stop
@@ -47,3 +47,12 @@ finally { Remove-Module $module.Name -Force -ErrorAction SilentlyContinue }
 & (Join-Path $PSScriptRoot 'Test-RemoteReconciliation.ps1')
 
 & (Join-Path $PSScriptRoot 'Test-ResolveJob.ps1')
+
+& (Join-Path $PSScriptRoot 'Test-Stabilization.ps1')
+
+& (Join-Path $PSScriptRoot 'Test-UploadSafety.ps1')
+& (Join-Path $PSScriptRoot 'Test-Runners.ps1')
+
+& (Join-Path $PSScriptRoot 'Test-RouteSafety.ps1')
+
+& (Join-Path $PSScriptRoot 'Test-DestinationBinding.ps1')

@@ -24,3 +24,16 @@
 - Wire limited transient retry/backoff into pre-transfer upload-session creation, with a simulated throttling test.
 
 - Implement explicit held-job remote SHA-256 reconciliation, local receipt verification, a worker lock, and repository-wide PowerShell parse gate.
+
+- Stabilize Windows PowerShell 5.1/PowerShell 7 receipt and alert marker replacement using a true null backup filename.
+- Hold missing/corrupt/inconsistent receipts, validate archived pairs, and reconcile interrupted Uploading jobs without replay.
+- Require complete configured app-only identity and verify tenant/application context in worker, reconciliation and alerts.
+- Serialize alerts; repair health-error recurrence and explicit worker recovery; preserve WhatIf marker state.
+- Report held work with runner exit 2 and retain exit 3 for failed health/alert evaluation.
+- Reject unexpected chunk acknowledgements and add synthetic recovery, upload-failure, enabled-alert and isolated runner tests.
+- Correct reconciliation mocks and fail fast on parser errors; reconcile operational documentation with verified offline behavior.
+- Validate all route directories and names before any processing to prevent cross-route spool delivery.
+- Report missing-PDF orphan receipts and unknown spool PDF/JSON names as held work; add regressions using the actual worker and runner with network blocked.
+
+- Introduce version 2 receipts with immutable route, tenant, app, drive and folder binding. Enforce binding in intake, upload, reconciliation, health and archive recovery; hold legacy v1 receipts without automatic migration or rebinding.
+- Add synthetic destination-drift, legacy-state preservation and certificate-rotation regressions.
