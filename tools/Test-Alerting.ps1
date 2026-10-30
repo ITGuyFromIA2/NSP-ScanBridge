@@ -7,7 +7,7 @@ try {
     New-Item -ItemType Directory -Path $temp | Out-Null
     try {
         $config = Join-Path $temp 'test.psd1'
-        Set-Content -LiteralPath $config -Value "@{ Alerts = @{ Enabled = \$false }; Routes = @() }"
+        Set-Content -LiteralPath $config -Value '@{ Alerts = @{ Enabled = $false }; Routes = @() }'
         $failed = $false
         try { Send-NSPScanBridgeAlert -ConfigurationPath $config -ErrorAction Stop } catch { $failed = $true }
         if (-not $failed) { throw 'Disabled alerting did not fail closed.' }
