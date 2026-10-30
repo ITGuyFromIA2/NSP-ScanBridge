@@ -20,3 +20,5 @@
 
 - Escalate worker and queue-health evaluation failures through the optional dispatch handler without exposing exception contents.
 - Add synthetic multi-chunk upload range and response contract test.
+
+- Wire limited transient retry/backoff into pre-transfer upload-session creation, with a simulated throttling test.
