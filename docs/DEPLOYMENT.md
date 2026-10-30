@@ -47,3 +47,7 @@ Run `scripts/Test-ScanBridgeHealth.ps1 -ConfigurationPath <private-config>` unde
 Use Resolve-NSPScanBridgeJob with an opaque JobId, RouteName, and the private ConfigurationPath. It reads the remote PDF, compares SHA-256, and only archives a confirmed exact match. Reconciliation holds the same worker lock. Keep spool access restricted and confirm sufficient free space. Unknown or mismatched remote copies remain held. Integration testing is required before operational use.
 
 Run tools/Test-Repo.ps1 locally before deployment; it now parses every PowerShell source/test/runner file before executing tests. The held-job recovery command requires an app-only Graph context and uses a spool-local temporary download for complete SHA-256 comparison.
+
+## Post-upload readback
+
+After testing with a synthetic document, a route may set VerifyRemoteAfterUpload = $true. The worker then reads remote bytes and checks SHA-256 and remote item ID before archiving. Readback uses restricted spool storage and can increase latency or hold a file if SharePoint has not yet made it readable.
