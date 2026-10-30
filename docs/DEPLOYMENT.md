@@ -33,3 +33,7 @@ The initial implementation still restricts files to 250 MB although it now uses 
 The worker now scans spool receipts for completed PDF moves whose receipt still remains in spool. It verifies that the receipt records a successful upload and validates the archived PDF's SHA-256 before moving the receipt to Archive. Conflicting or incomplete states remain held for human review; the worker does not reupload these files. A synthetic offline test exercises the interrupted move and an idempotent rerun. No automatic cloud-side reconciliation is implemented.
 
 Health reporting now surfaces held/review and invalid/orphan receipt counts, not just total pending files. A racy remote GET preflight was removed; conflict handling is delegated to the Graph upload-session fail policy, subject to live validation.
+
+## Monitoring
+
+Run `Test-NSPScanBridgeHealth -ConfigurationPath <private-config> -MaximumPending 25 -MaximumPendingMinutes 10` as a read-only health check. Inspect `Healthy` and `Conditions`; do not record PDF names or content in central monitoring. This currently evaluates local state only and does not send alerts. Automatic transient retry policy is not wired into the worker, to avoid replaying ambiguous upload sessions without cloud reconciliation.
