@@ -47,14 +47,12 @@ function Send-NSPScanBridgeAlert {
             OldestPendingMinutes = $null
         })
     }
-    if ($WorkerFailed) {
-        $results += [pscustomobject]@{
-            Route = 'Worker'
-            Healthy = $false
-            Conditions = @('WorkerFailure')
-            PendingCount = -1
-            OldestPendingMinutes = $null
-        }
+    $results += [pscustomobject]@{
+        Route = 'Worker'
+        Healthy = (-not $WorkerFailed)
+        Conditions = if ($WorkerFailed) { @('WorkerFailure') } else { @() }
+        PendingCount = 0
+        OldestPendingMinutes = $null
     }
     foreach ($result in $results) {
         $routeId = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$result.Route))
