@@ -17,3 +17,6 @@
 - Add PHI-minimizing queue health thresholds for monitoring integrations.
 
 - Add optional Graph-based dispatch escalation with persistent duplicate suppression, a scheduled monitoring entry point, and a fail-closed configuration test.
+
+- Escalate worker and queue-health evaluation failures through the optional dispatch handler without exposing exception contents.
+- Add synthetic multi-chunk upload range and response contract test.
