@@ -23,7 +23,7 @@ function Save-NSPScanBridgeReceipt {
             Queued = @('Queued','Uploading','Review')
             Uploading = @('Uploading','Uploaded','Review')
             Uploaded = @('Uploaded')
-            Review = if ($VerifiedReconciliation) { @('Review','Uploaded') } else { @('Review') }
+            Review = $(if ($VerifiedReconciliation) { @('Review','Uploaded') } else { @('Review') })
         }
         if (-not $allowed.ContainsKey([string]$previous.State) -or $State -notin $allowed[[string]$previous.State]) {
             throw 'Invalid receipt state transition.'
