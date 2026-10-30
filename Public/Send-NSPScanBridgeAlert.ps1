@@ -13,7 +13,8 @@ function Send-NSPScanBridgeAlert {
     param(
         [Parameter(Mandatory)][string]$ConfigurationPath,
         [ValidateRange(1,100000)][int]$MaximumPending = 25,
-        [ValidateRange(1,10080)][int]$MaximumPendingMinutes = 10
+        [ValidateRange(1,10080)][int]$MaximumPendingMinutes = 10,
+        [switch]$WorkerFailed
     )
     $config = Import-PowerShellDataFile -LiteralPath $ConfigurationPath -ErrorAction Stop
     if (-not $config.Alerts -or -not $config.Alerts.Enabled) { throw 'Alerting must be explicitly enabled.' }
@@ -32,7 +33,30 @@ function Send-NSPScanBridgeAlert {
         throw 'Alerts.Auth requires a dedicated app-only mail identity.'
     }
     Connect-NSPGraphAppOnly -TenantId $alerts.Auth.TenantId -ClientId $alerts.Auth.ClientId -CertificateThumbprint $alerts.Auth.CertificateThumbprint | Out-Null
-    foreach ($result in @(Test-NSPScanBridgeHealth -ConfigurationPath $ConfigurationPath -MaximumPending $MaximumPending -MaximumPendingMinutes $MaximumPendingMinutes)) {
+    $results = @()
+    try {
+        $results = @(Test-NSPScanBridgeHealth -ConfigurationPath $ConfigurationPath -MaximumPending $MaximumPending -MaximumPendingMinutes $MaximumPendingMinutes)
+        if ($results.Count -eq 0) { throw 'No routes returned health.' }
+    } catch {
+        # Never leak the exception message into the ticket; it may contain a private path.
+        $results = @([pscustomobject]@{
+            Route = 'System'
+            Healthy = $false
+            Conditions = @('HealthCheckFailed')
+            PendingCount = -1
+            OldestPendingMinutes = $null
+        })
+    }
+    if ($WorkerFailed) {
+        $results += [pscustomobject]@{
+            Route = 'Worker'
+            Healthy = $false
+            Conditions = @('WorkerFailure')
+            PendingCount = -1
+            OldestPendingMinutes = $null
+        }
+    }
+    foreach ($result in $results) {
         $routeId = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$result.Route))
         $routeId = $routeId.TrimEnd('=').Replace('+','-').Replace('/','_')
         $marker = Join-Path $alerts.StateDirectory ($routeId + '.alert.json')
