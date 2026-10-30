@@ -37,8 +37,20 @@ function Send-NSPScanBridgeAlert {
         $routeId = $routeId.TrimEnd('=').Replace('+','-').Replace('/','_')
         $marker = Join-Path $alerts.StateDirectory ($routeId + '.alert.json')
         if ($result.Healthy) {
-            # Preserve historical marker for human review; do not automatically
-            # delete it and create repeated tickets if the condition flaps.
+            if (Test-Path -LiteralPath $marker -PathType Leaf) {
+                $prior = Get-Content -LiteralPath $marker -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                if ($prior.Active -ne $false) {
+                    $prior | Add-Member -NotePropertyName Active -NotePropertyValue $false -Force
+                    $prior | Add-Member -NotePropertyName ResolvedUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
+                    $resolvedTemp = $marker + '.' + [guid]::NewGuid().ToString('N') + '.tmp'
+                    try {
+                        [IO.File]::WriteAllText($resolvedTemp, ($prior | ConvertTo-Json -Depth 5))
+                        [IO.File]::Replace($resolvedTemp, $marker, $null)
+                    } finally {
+                        if (Test-Path -LiteralPath $resolvedTemp) { Remove-Item -LiteralPath $resolvedTemp -Force }
+                    }
+                }
+            }
             continue
         }
         $conditions = @($result.Conditions | Sort-Object -Unique)
@@ -47,7 +59,7 @@ function Send-NSPScanBridgeAlert {
         if (Test-Path -LiteralPath $marker -PathType Leaf) {
             $existing = Get-Content -LiteralPath $marker -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
         }
-        if ($existing -and $existing.Signature -eq $signature) { continue }
+        if ($existing -and $existing.Active -ne $false -and $existing.Signature -eq $signature) { continue }
         $subject = '[NSP.ScanBridge] Manual intervention required'
         $body = @(
             'ScanBridge detected an unresolved delivery condition.'
@@ -61,7 +73,7 @@ function Send-NSPScanBridgeAlert {
         if ($PSCmdlet.ShouldProcess($alerts.To, 'Send ScanBridge ticket escalation')) {
             Send-NSPGraphMail -From $alerts.From -To @($alerts.To) -Subject $subject -Body $body -ErrorAction Stop
             $temp = $marker + '.' + [guid]::NewGuid().ToString('N') + '.tmp'
-            $json = @{ Signature = $signature; SentUtc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json
+            $json = @{ Signature = $signature; Active = $true; SentUtc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json
             try {
                 [IO.File]::WriteAllText($temp, $json)
                 if (Test-Path -LiteralPath $marker) {
