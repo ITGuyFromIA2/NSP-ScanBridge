@@ -16,4 +16,4 @@
 
 Jobs receive opaque GUID names when claimed into the spool. A confirmed upload moves the source into Archive. Existing remote names and ambiguous responses are held for manual reconciliation and the spool item is retained. A power loss before archive may result in an intentionally held job, not automatic overwrite.
 
-The initial implementation supports files up to 250 MB, does not use upload sessions, and does not implement full receipts, backoff scheduling, content hash verification, Windows event logging, or alerting. Validate Microsoft Graph conflict behavior and failure handling before real use.
+The initial implementation still restricts files to 250 MB although it now uses conflict-fail upload sessions, and does not implement full receipts, backoff scheduling, content hash verification, Windows event logging, or alerting. Validate Microsoft Graph conflict behavior and failure handling before real use.
