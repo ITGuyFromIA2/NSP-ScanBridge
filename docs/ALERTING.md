@@ -11,3 +11,5 @@ Messages contain only generic route labels, condition codes, counts, and age. Ne
 A Graph-accepted send is not confirmation that a ticket was opened. A crash after acceptance but before marker persistence may cause a duplicate. An unsuccessful send is not marked and can be retried. After a healthy check, the marker is retained but marked resolved. A subsequent unhealthy occurrence can therefore produce a new ticket. Transient health flapping can still open repeat tickets; consider an operator-defined stable recovery window before production.
 
 **Status:** Development-only. Run offline tests and then synthetic live mail tests before using for production incidents.
+
+The scheduled ingestion runner calls alert evaluation even after a worker exception. Its WorkerFailure incident remains active until a subsequent successful worker pass; HealthCheckFailed covers unreadable/incomplete queue health. These alerts are not independent of the host: a powered-off machine, broken scheduler, or failed authentication still requires external RMM monitoring. A Graph-accepted email is not a verified dispatch ticket.
