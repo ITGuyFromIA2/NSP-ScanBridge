@@ -45,3 +45,5 @@ finally { Remove-Module $module.Name -Force -ErrorAction SilentlyContinue }
 & (Join-Path $PSScriptRoot 'Test-SessionRetry.ps1')
 
 & (Join-Path $PSScriptRoot 'Test-RemoteReconciliation.ps1')
+
+& (Join-Path $PSScriptRoot 'Test-ResolveJob.ps1')
