@@ -5,7 +5,8 @@ foreach ($file in @('Save-NSPScanBridgeReceipt.ps1','Complete-NSPScanBridgeArchi
 }
 . (Join-Path $root 'Public/Resolve-NSPScanBridgeJob.ps1')
 $script:remoteBytes = [byte[]](37,80,68,70,45,49,46,52)
-function Get-MgContext { param($ErrorAction) return @{ AuthType = 'AppOnly' } }
+$script:authType = 'AppOnly'
+function Get-MgContext { param($ErrorAction) return @{ AuthType = $script:authType } }
 function Invoke-NSPGraphRequest {
     param($Method,$Uri,$ErrorAction)
     return @{ id='remote-confirmed'; size=8; '@microsoft.graph.downloadUrl'='https://example.invalid/file' }
@@ -26,6 +27,11 @@ try {
     $config = Join-Path $base 'config.psd1'
     $text = "@{ LockPath = '$safeBase\lock\worker.lock'; Routes = @( @{ Name = 'Test'; Spool = '$safeBase\spool'; Archive = '$safeBase\archive'; DriveId = 'drive'; FolderItemId = 'folder' } ) }"
     [IO.File]::WriteAllText($config,$text)
+    $script:authType = 'Delegated'
+    $denied = $false
+    try { Resolve-NSPScanBridgeJob -ConfigurationPath $config -RouteName Test -JobId $id -ErrorAction Stop | Out-Null } catch { $denied = $true }
+    if (-not $denied) { throw 'Delegated reconciliation was not rejected.' }
+    $script:authType = 'AppOnly'
     $script:remoteBytes = [byte[]](37,80,68,70,45,49,46,53)
     $mismatch = Resolve-NSPScanBridgeJob -ConfigurationPath $config -RouteName Test -JobId $id
     if ($mismatch.Status -ne 'Mismatch' -or -not (Test-Path $pdf)) { throw 'Mismatch failed to preserve spool.' }
