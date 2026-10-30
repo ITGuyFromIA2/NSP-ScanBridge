@@ -34,6 +34,12 @@ try {
     if ($spoolFiles.Count -ne 1 -or $spoolFiles[0].Name -cnotmatch '^[0-9a-f]{32}\.pdf$') { throw 'Opaque spool name missing.' }
     $health = @(Get-NSPScanBridgeHealth -ConfigurationPath $configPath)
     if ($health.Count -ne 1 -or $health[0].PendingCount -ne 1 -or $health[0].SourceCount -ne 0) { throw 'Health snapshot did not reflect the queued job.' }
+    $receiptPath = [IO.Path]::ChangeExtension($spoolFiles[0].FullName, '.json')
+    if (-not (Test-Path -LiteralPath $receiptPath)) { throw 'Missing persistent receipt.' }
+    $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+    if ($receipt.State -ne 'Queued' -or $receipt.Hash -ne (Get-FileHash $spoolFiles[0].FullName -Algorithm SHA256).Hash) {
+        throw 'Receipt does not match queued PDF.'
+    }
     $again = @(Invoke-NSPScanBridge -ConfigurationPath $configPath -IntakeOnly)
     if ($again.Count -ne 0) { throw 'Second pass unexpectedly claimed another job.' }
     if (-not (Test-Path -LiteralPath $spoolFiles[0].FullName)) { throw 'Second pass lost the queued PDF.' }
