@@ -9,6 +9,9 @@ try {
     Save-NSPScanBridgeReceipt -PdfPath $temp -State Uploaded -RemoteId 'synthetic-remote'
     $receipt = Get-Content ([IO.Path]::ChangeExtension($temp, '.json')) -Raw | ConvertFrom-Json
     if ($receipt.State -ne 'Uploaded' -or $receipt.RemoteId -ne 'synthetic-remote') { throw 'Receipt transition failed.' }
+    $invalid = $false
+    try { Save-NSPScanBridgeReceipt -PdfPath $temp -State Queued } catch { $invalid = $true }
+    if (-not $invalid) { throw 'Uploaded state reverted unexpectedly.' }
     [IO.File]::AppendAllText($temp, 'modified')
     $rejected = $false
     try { Save-NSPScanBridgeReceipt -PdfPath $temp -State Review } catch { $rejected = $true }
