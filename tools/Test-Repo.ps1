@@ -26,3 +26,5 @@ try {
 finally { Remove-Module $module.Name -Force -ErrorAction SilentlyContinue }
 
 & (Join-Path $PSScriptRoot 'Test-Intake.ps1')
+
+& (Join-Path $PSScriptRoot 'Test-UploadSession.ps1')
