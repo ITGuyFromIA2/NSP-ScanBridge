@@ -83,20 +83,10 @@ function Invoke-NSPScanBridge {
                 }
                 if ($receipt.State -ne 'Queued') { throw 'Unrecognized job receipt state.' }
 
-                $drive = [uri]::EscapeDataString([string]$route.DriveId)
-                $folder = [uri]::EscapeDataString([string]$route.FolderItemId)
-                $name = [uri]::EscapeDataString($job.Name)
-                $baseUri = "https://graph.microsoft.com/v1.0/drives/$drive/items/$($folder):/$name"
                 try {
                     if ($job.Length -gt 250MB) { throw 'Configured development size limit exceeded.' }
-                    # Reject ambiguous retries, rather than accidentally replacing an existing file.
-                    $remote = $null
-                    try { $remote = Invoke-MgGraphRequest -Method GET -Uri ($baseUri + ':') -OutputType PSObject -ErrorAction Stop }
-                    catch {
-                        $status = $_.Exception.ResponseStatusCode
-                        if ($null -eq $status -or [int]$status -ne 404) { throw }
-                    }
-                    if ($remote) { throw 'Remote file already exists; manual reconciliation required.' }
+                    # The upload-session fail policy is authoritative. A preflight GET
+                    # cannot prevent a race and can mishandle an otherwise normal 404.
                     Save-NSPScanBridgeReceipt -PdfPath $job.FullName -State Uploading
                     $result = Send-NSPScanBridgeUploadSession -Path $job.FullName -DriveId ([string]$route.DriveId) -FolderItemId ([string]$route.FolderItemId) -Name $job.Name
                     if (-not $result.id -or [long]$result.size -ne [long]$job.Length) {
