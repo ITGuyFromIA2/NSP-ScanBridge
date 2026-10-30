@@ -1,0 +1,48 @@
+function Send-NSPScanBridgeUploadSession {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$DriveId,
+        [Parameter(Mandatory)][string]$FolderItemId,
+        [Parameter(Mandatory)][string]$Name
+    )
+    $info = Get-Item -LiteralPath $Path -ErrorAction Stop
+    if ($info.Length -eq 0) { throw 'Cannot upload an empty file.' }
+    $drive = [uri]::EscapeDataString($DriveId)
+    $parent = [uri]::EscapeDataString($FolderItemId)
+    $encodedName = [uri]::EscapeDataString($Name)
+    $uri = "drives/$drive/items/$($parent):/$($encodedName):/createUploadSession"
+    $session = Invoke-NSPGraphRequest -Method POST -Uri $uri -Body @{
+        item = @{ '@microsoft.graph.conflictBehavior' = 'fail'; name = $Name }
+    }
+    if (-not $session.uploadUrl -or $session.uploadUrl -notmatch '^https://') {
+        throw 'Graph did not provide an HTTPS upload URL.'
+    }
+    $chunkSize = 327680 * 16
+    $stream = [IO.File]::Open($info.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        $position = [long]0
+        while ($position -lt $stream.Length) {
+            $count = [int][math]::Min($chunkSize, $stream.Length - $position)
+            $bytes = New-Object byte[] $count
+            $read = 0
+            while ($read -lt $count) {
+                $n = $stream.Read($bytes, $read, $count - $read)
+                if ($n -eq 0) { throw 'Unexpected end of file during upload.' }
+                $read += $n
+            }
+            $end = $position + $count - 1
+            $headers = @{ 'Content-Range' = "bytes $position-$end/$($stream.Length)" }
+            $args = @{ Method = 'PUT'; Uri = $session.uploadUrl; Body = $bytes; ContentType = 'application/octet-stream'; Headers = $headers; ErrorAction = 'Stop' }
+            $response = Invoke-RestMethod @args
+            $position += $count
+            if ($position -lt $stream.Length -and -not $response.nextExpectedRanges) {
+                throw 'Graph did not acknowledge next expected range.'
+            }
+        }
+        if (-not $response.id -or [long]$response.size -ne $stream.Length) {
+            throw 'Final upload response did not confirm drive item and byte size.'
+        }
+        return $response
+    } finally { $stream.Dispose() }
+}
