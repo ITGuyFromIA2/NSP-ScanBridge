@@ -24,3 +24,5 @@ try {
     Write-Host "Passed: $($moduleInfo.Name) manifest, exports, file readiness."
 }
 finally { Remove-Module $module.Name -Force -ErrorAction SilentlyContinue }
+
+& (Join-Path $PSScriptRoot 'Test-Intake.ps1')
