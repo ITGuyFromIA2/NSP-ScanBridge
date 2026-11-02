@@ -10,9 +10,9 @@ function Assert-Safety([bool]$Condition,[string]$Message) {
     if (-not $Condition) { throw $Message }
     $script:checks++
 }
-function Import-Module { param($Name,$ErrorAction) if ($Name -ne 'NSP.M365.Graph') { throw 'Unexpected import.' } }
-function Connect-NSPGraphAppOnly { param($TenantId,$ClientId,$CertificateThumbprint,$ErrorAction) }
-function Get-MgContext { param($ErrorAction) @{ AuthType='AppOnly'; TenantId='test-tenant'; ClientId='test-app' } }
+function Import-Module { param($Name,[switch]$PassThru,$ErrorAction) if ($Name -ne 'NSP.M365.Graph') { throw 'Unexpected import.' }; if ($PassThru) { [pscustomobject]@{Name='NSP.M365.Graph';ExportedCommands=@{'Connect-NSPGraphAppOnly'=(Get-Command Connect-NSPGraphAppOnly)}} } }
+function Connect-NSPGraphAppOnly { param($TenantId,$ClientId,$CertificateThumbprint,$ContextScope,$ErrorAction) }
+function Get-MgContext { param($ErrorAction) @{ AuthType='AppOnly'; ContextScope='Process'; TenantId='test-tenant'; ClientId='test-app' } }
 $script:uploads = 0
 function Send-NSPScanBridgeUploadSession {
     param($Path,$DriveId,$FolderItemId,$Name)
@@ -86,9 +86,9 @@ try {
 foreach ($directory in 'Private','Public') {
     foreach ($file in Get-ChildItem -LiteralPath (Join-Path '__SOURCE__' $directory) -Filter '*.ps1' -File) { . $file.FullName }
 }
-function Import-Module { param($Name,$ErrorAction) if ($Name -ne 'NSP.M365.Graph') { throw 'Unexpected import.' } }
-function Connect-NSPGraphAppOnly { param($TenantId,$ClientId,$CertificateThumbprint,$ErrorAction) }
-function Get-MgContext { param($ErrorAction) @{ AuthType='AppOnly'; TenantId='test-tenant'; ClientId='test-app' } }
+function Import-Module { param($Name,[switch]$PassThru,$ErrorAction) if ($Name -ne 'NSP.M365.Graph') { throw 'Unexpected import.' }; if ($PassThru) { [pscustomobject]@{Name='NSP.M365.Graph';ExportedCommands=@{'Connect-NSPGraphAppOnly'=(Get-Command Connect-NSPGraphAppOnly)}} } }
+function Connect-NSPGraphAppOnly { param($TenantId,$ClientId,$CertificateThumbprint,$ContextScope,$ErrorAction) }
+function Get-MgContext { param($ErrorAction) @{ AuthType='AppOnly'; ContextScope='Process'; TenantId='test-tenant'; ClientId='test-app' } }
 function Send-NSPScanBridgeUploadSession { throw 'Unexpected upload.' }
 function Invoke-NSPGraphRequest { throw 'Network forbidden.' }
 function Invoke-WebRequest { throw 'Network forbidden.' }

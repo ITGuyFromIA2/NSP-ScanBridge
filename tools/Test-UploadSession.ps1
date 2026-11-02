@@ -22,6 +22,15 @@ try {
     if ($result.id -ne 'synthetic-item') { throw 'Missing completed result.' }
     if ($script:sessionRequest.Method -ne 'POST') { throw 'Session did not start with POST.' }
     if ($script:sessionRequest.Body.item['@microsoft.graph.conflictBehavior'] -ne 'fail') { throw 'Conflict policy must be fail.' }
+    # Check the serialized wire shape, not only the in-memory dictionary values.
+    $json = ConvertTo-Json -InputObject $script:sessionRequest.Body -Depth 32 -Compress
+    $annotationOffset = $json.IndexOf('"@microsoft.graph.conflictBehavior"')
+    $nameOffset = $json.IndexOf('"name"')
+    if ($annotationOffset -lt 0 -or $nameOffset -lt 0 -or $annotationOffset -gt $nameOffset) {
+        throw 'SharePoint requires the conflict annotation before name in the serialized request.'
+    }
+    $wire = $json | ConvertFrom-Json
+    if ($wire.item.name -cne '123.pdf' -or $wire.item.'@microsoft.graph.conflictBehavior' -cne 'fail') { throw 'Serialized session body changed.' }
     if ($script:uploadedHeaders['Content-Range'] -ne 'bytes 0-8/9') { throw 'Incorrect content range.' }
     Write-Host 'Passed: synthetic upload-session contract.'
 } finally { Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue }

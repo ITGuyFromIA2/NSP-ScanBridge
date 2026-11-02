@@ -5,8 +5,9 @@ function Test-NSPScanBridgeFileReady {
         [ValidateRange(1,3600)][int]$MinimumAgeSeconds = 15
     )
     $item = Get-Item -LiteralPath $Path -ErrorAction Stop
-    if ($item.PSIsContainer -or $item.Length -le 0 -or $item.Extension -ine '.pdf') { return $false }
-    if (((Get-Date).ToUniversalTime() - $item.LastWriteTimeUtc).TotalSeconds -lt $MinimumAgeSeconds) { return $false }
+    if ($item.PSIsContainer) { return $false }
+    $metadata = Get-NSPScanBridgeReadinessDecision -Mode AgeAndExclusive -Length $item.Length -LastWriteTimeUtc $item.LastWriteTimeUtc -IsPdf ($item.Extension -ieq '.pdf') -IsContainer $item.PSIsContainer -MinimumAgeSeconds $MinimumAgeSeconds
+    if (-not $metadata.MetadataEligible) { return $false }
     $stream = $null
     try {
         $stream = [System.IO.File]::Open($item.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)

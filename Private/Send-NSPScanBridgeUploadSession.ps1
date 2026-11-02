@@ -16,7 +16,9 @@ function Send-NSPScanBridgeUploadSession {
     for ($attempt = 1; $attempt -le 3; $attempt++) {
         try {
             $session = Invoke-NSPGraphRequest -Method POST -Uri $uri -Body @{
-                item = @{ '@microsoft.graph.conflictBehavior' = 'fail'; name = $Name }
+                # SharePoint requires the conflict annotation before ordinary properties.
+                # An unordered hashtable can serialize name first and produce HTTP 400.
+                item = [ordered]@{ '@microsoft.graph.conflictBehavior' = 'fail'; name = $Name }
             } -ErrorAction Stop
             break
         } catch {

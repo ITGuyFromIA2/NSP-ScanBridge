@@ -27,8 +27,7 @@ function Invoke-NSPScanBridge {
             $lock = [IO.File]::Open($lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
         } catch [IO.IOException] { throw 'Another ScanBridge process holds the lock.' }
         if (-not $IntakeOnly -and -not $WhatIfPreference) {
-            Import-Module NSP.M365.Graph -ErrorAction Stop
-            Assert-NSPScanBridgeContext -Auth $config.Auth -Connect
+            Connect-NSPScanBridgeContext -Auth $config.Auth
         }
         foreach ($route in $routes) {
             $binding = $bindings[$route.Name]

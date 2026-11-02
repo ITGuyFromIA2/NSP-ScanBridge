@@ -56,3 +56,7 @@ finally { Remove-Module $module.Name -Force -ErrorAction SilentlyContinue }
 & (Join-Path $PSScriptRoot 'Test-RouteSafety.ps1')
 
 & (Join-Path $PSScriptRoot 'Test-DestinationBinding.ps1')
+
+& (Join-Path $PSScriptRoot 'Test-ContextAdapter.ps1')
+
+& (Join-Path $PSScriptRoot 'Test-ReadinessDiagnostic.ps1')

@@ -10,9 +10,9 @@ function Assert-BindingRejected([scriptblock]$Action,[string]$Message) {
     try { & $Action | Out-Null } catch { $rejected=$true }
     Assert-BindingSafety $rejected $Message
 }
-function Import-Module { param($Name,$ErrorAction) if($Name -ne 'NSP.M365.Graph'){throw 'Unexpected import.'} }
-$script:context=@{AuthType='AppOnly';TenantId='test-tenant';ClientId='test-app'}
-function Connect-NSPGraphAppOnly { param($TenantId,$ClientId,$CertificateThumbprint,$ErrorAction) $script:context.TenantId=$TenantId; $script:context.ClientId=$ClientId }
+function Import-Module { param($Name,[switch]$PassThru,$ErrorAction) if($Name -ne 'NSP.M365.Graph'){throw 'Unexpected import.'}; if ($PassThru) { [pscustomobject]@{Name='NSP.M365.Graph';ExportedCommands=@{'Connect-NSPGraphAppOnly'=(Get-Command Connect-NSPGraphAppOnly)}} } }
+$script:context=@{AuthType='AppOnly'; ContextScope='Process';TenantId='test-tenant';ClientId='test-app'}
+function Connect-NSPGraphAppOnly { param($TenantId,$ClientId,$CertificateThumbprint,$ContextScope,$ErrorAction) $script:context.TenantId=$TenantId; $script:context.ClientId=$ClientId }
 function Get-MgContext { param($ErrorAction) $script:context }
 $script:uploads=0; $script:lookups=0; $script:downloads=0
 function Send-NSPScanBridgeUploadSession { param($Path,$DriveId,$FolderItemId,$Name) $script:uploads++; @{id='synthetic-item';size=(Get-Item -LiteralPath $Path).Length} }

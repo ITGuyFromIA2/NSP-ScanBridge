@@ -15,10 +15,10 @@ function Assert-Rejected([scriptblock]$Action, [string]$Message) {
     Assert-Check $rejected $Message
 }
 # Every transport and connection entry point below is synthetic. Fail on an unexpected call.
-function Import-Module { param($Name,$ErrorAction) if ($Name -ne 'NSP.M365.Graph') { throw 'Unexpected module import.' } }
-$script:context = @{ AuthType='AppOnly'; TenantId='test-tenant'; ClientId='test-app' }
+function Import-Module { param($Name,[switch]$PassThru,$ErrorAction) if ($Name -ne 'NSP.M365.Graph') { throw 'Unexpected module import.' }; if ($PassThru) { [pscustomobject]@{Name='NSP.M365.Graph';ExportedCommands=@{'Connect-NSPGraphAppOnly'=(Get-Command Connect-NSPGraphAppOnly)}} } }
+$script:context = @{ AuthType='AppOnly'; ContextScope='Process'; TenantId='test-tenant'; ClientId='test-app' }
 $script:connections = 0
-function Connect-NSPGraphAppOnly { param($TenantId,$ClientId,$CertificateThumbprint,$ErrorAction) $script:connections++ }
+function Connect-NSPGraphAppOnly { param($TenantId,$ClientId,$CertificateThumbprint,$ContextScope,$ErrorAction) $script:connections++ }
 function Get-MgContext { param($ErrorAction) $script:context }
 $script:uploads = 0
 function Send-NSPScanBridgeUploadSession {
@@ -110,7 +110,7 @@ try {
     Assert-Rejected { Invoke-NSPScanBridge -ConfigurationPath $config } 'Wrong tenant was accepted by worker.'
     $script:context.TenantId = 'test-tenant'
     $connectionCount = $script:connections
-    Assert-Rejected { Assert-NSPScanBridgeContext -Auth @{ TenantId='test-tenant' } -Connect } 'Incomplete authentication was accepted.'
+    Assert-Rejected { Connect-NSPScanBridgeContext -Auth @{ TenantId='test-tenant' } } 'Incomplete authentication was accepted.'
     Assert-Check ($script:connections -eq $connectionCount) 'Incomplete configuration attempted authentication.'
     $script:remoteBytes = [byte[]](37,80,68,70,45,49,46,53)
     $result = Resolve-NSPScanBridgeJob -ConfigurationPath $config -RouteName RouteA -JobId $interruptedId

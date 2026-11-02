@@ -5,7 +5,7 @@ function Resolve-NSPScanBridgeJob {
     .DESCRIPTION
         Read-back comparison uses actual remote bytes and SHA-256 rather than
         trusting filename or size. Does not retry the upload or overwrite files.
-        Requires a previously established app-only Graph context.
+        Requires a previously established Process-scoped app-only Graph context.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(

@@ -40,11 +40,10 @@ function Send-NSPScanBridgeAlert {
         $alertLock = [IO.File]::Open((Join-Path $alerts.StateDirectory 'alerts.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
     } catch [IO.IOException] { throw 'Another ScanBridge alert process holds the lock.' }
     try {
-        Import-Module NSP.M365.Graph -ErrorAction Stop
         if (-not $alerts.Auth -or -not $alerts.Auth.TenantId -or -not $alerts.Auth.ClientId -or -not $alerts.Auth.CertificateThumbprint) {
             throw 'Alerts.Auth requires a dedicated app-only mail identity.'
         }
-        if (-not $WhatIfPreference) { Assert-NSPScanBridgeContext -Auth $alerts.Auth -Connect }
+        if (-not $WhatIfPreference) { Connect-NSPScanBridgeContext -Auth $alerts.Auth }
         $results = @()
         try {
             $results = @(Test-NSPScanBridgeHealth -ConfigurationPath $ConfigurationPath -MaximumPending $MaximumPending -MaximumPendingMinutes $MaximumPendingMinutes)

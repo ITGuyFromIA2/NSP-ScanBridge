@@ -49,3 +49,4 @@ Version 2 receipts contain an immutable destination binding (route name, tenant 
 Session creation retries recognized transient HTTP failures at most three times before binary transfer. Binary transfer is sequential, uses 320 KiB-multiple chunks, and checks the next expected position and final item ID/size. An ambiguous transfer is held. Optional `VerifyRemoteAfterUpload` adds full remote readback before acknowledgement. The development per-file limit remains 250 MB.
 
 See [deployment and evidence limits](docs/DEPLOYMENT.md) and the placeholder-only [configuration](config/ScanBridge.example.psd1). Real configuration, document content, filenames, addresses, tenant identifiers and credentials stay outside Git.
+For read-only comparison of readiness decisions against live file lifecycles, see [the readiness diagnostic](docs/READINESS-DIAGNOSTIC.md). It uses the existing settings file and never claims or uploads documents.

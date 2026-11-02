@@ -2,6 +2,14 @@
 
 ## 0.1.0
 
+- Require NSP.M365.Graph 0.1.2 or later when selecting the connector, so an older copy earlier on PSModulePath is skipped rather than loaded; exclude agent/handoff documents from the Gallery package.
+
+- Add a read-only source readiness diagnostic comparing the existing age/open baseline with sustained-observation policies, including late-change revocation and bounded watcher cleanup.
+
+- Separate ScanBridge connection from context validation; require a capable shared connector and explicitly request Process scope before worker claims or alert mail.
+
+- Preserve conflict-annotation order in upload-session JSON to prevent SharePoint HTTP 400 responses.
+
 - Initial public module scaffold.
 - Add stable-file preflight for scanner PDF output.
 
