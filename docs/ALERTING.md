@@ -8,6 +8,14 @@ Use `scripts/Send-ScanBridgeAlerts.ps1 -ConfigurationPath <private-config>` as a
 
 Messages contain only generic route labels, condition codes, counts, and age. Never include patient names, document names, PDF attachments, actual local paths or any tenant identifier. Treat route labels as potentially sensitive and choose generic names. On a repeated identical condition, a persistent alert marker suppresses duplicate emails. A changed condition signature can cause a new ticket.
 
+## Certificate renewal notices
+
+Each alert evaluation also checks the ingestion (`Auth`) and alert (`Alerts.Auth`) certificates by thumbprint in `Cert:\LocalMachine\My`, then `Cert:\CurrentUser\My`, of the account running it. A certificate that is missing, expired or within `Alerts.CertificateWarningDays` (1-365, default 30) of expiry raises the `Certificates` incident, with subject `[NSP.ScanBridge] Certificate renewal required`, condition codes such as `IngestionCertificateExpiring` or `AlertCertificateExpired`, and the fewest days remaining. Thumbprints, subjects and tenant details are not included. The notice is sent once per condition set: a daily countdown does not repeat it, expiry after a warning sends again, and renewal resolves the marker. An unreadable store reports `CertificateCheckFailed`. `Certificates` is a reserved route name.
+
+The notice depends on alert mail still working. An expired or missing alert certificate stops the alert sign-in itself, so act on the warning before expiry. External RMM monitoring is still needed for that case.
+
+## Delivery limits
+
 A Graph-accepted send is not confirmation that a ticket was opened. A crash after acceptance but before marker persistence may cause a duplicate. An unsuccessful send is not marked and can be retried. After a healthy check, the marker is retained but marked resolved. A subsequent unhealthy occurrence can therefore produce a new ticket. Transient health flapping can still open repeat tickets; consider an operator-defined stable recovery window before production.
 
 **Status:** Development-only. Run offline tests and then synthetic live mail tests before using for production incidents.

@@ -40,6 +40,8 @@ function Invoke-WebRequest {
     [IO.File]::WriteAllBytes($OutFile, $script:remoteBytes)
 }
 function Invoke-RestMethod { throw 'Unexpected binary network transport.' }
+# Certificate notices are covered by Test-CertificateAlerts; keep the local store out of these counts.
+function Get-NSPScanBridgeCertificateStatus { param($Thumbprint,$WarningDays,$ErrorAction) [pscustomobject]@{ Status='Valid'; DaysRemaining=365 } }
 $script:archiveImplementation = (Get-Command Complete-NSPScanBridgeArchive).ScriptBlock
 $script:archiveFault = ''
 function Complete-NSPScanBridgeArchive {

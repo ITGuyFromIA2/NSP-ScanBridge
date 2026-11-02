@@ -11,6 +11,7 @@
     From = '<monitoring-mailbox@example.com>'
     To = '<dispatch-address@example.com>'
     StateDirectory = 'C:\ProgramData\NSP\ScanBridge\AlertState'
+    CertificateWarningDays = 30 # Optional, 1-365. Notice when the ingestion or alert certificate is this close to expiry.
     Auth = @{
       TenantId = '<tenant-guid>'
       ClientId = '<dedicated-mail-app-guid>'

@@ -30,10 +30,15 @@ function Send-NSPScanBridgeAlert {
     if (-not (Test-Path -LiteralPath $alerts.StateDirectory -PathType Container)) {
         throw 'Alert state directory must already exist.'
     }
+    $warningDays = 30
+    if ($alerts.ContainsKey('CertificateWarningDays')) {
+        $warningDays = $alerts.CertificateWarningDays -as [int]
+        if ($null -eq $warningDays -or $warningDays -lt 1 -or $warningDays -gt 365) { throw 'Alerts.CertificateWarningDays must be 1 to 365.' }
+    }
     $routeNames = @($config.Routes | ForEach-Object { [string]$_.Name })
-    if (@($routeNames | Where-Object { $_ -in @('System','Worker') }).Count -gt 0 -or
+    if (@($routeNames | Where-Object { $_ -in @('System','Worker','Certificates') }).Count -gt 0 -or
         @($routeNames | Group-Object | Where-Object Count -gt 1).Count -gt 0) {
-        throw 'Alert routes require unique names excluding the reserved System and Worker names.'
+        throw 'Alert routes require unique names excluding the reserved System, Worker and Certificates names.'
     }
     $alertLock = $null
     try {
@@ -68,6 +73,29 @@ function Send-NSPScanBridgeAlert {
             OldestPendingMinutes = $null
         }
         }
+        # Proactive notice: the ingestion or alert certificate is near or past expiry.
+        $certificateConditions = @()
+        $certificateDays = $null
+        try {
+            foreach ($identity in @(@{ Name = 'Ingestion'; Auth = $config.Auth }, @{ Name = 'Alert'; Auth = $alerts.Auth })) {
+                if (-not $identity.Auth -or -not $identity.Auth.CertificateThumbprint) { continue }
+                $status = Get-NSPScanBridgeCertificateStatus -Thumbprint ([string]$identity.Auth.CertificateThumbprint) -WarningDays $warningDays -ErrorAction Stop
+                if ($status.Status -ne 'Valid') { $certificateConditions += ($identity.Name + 'Certificate' + $status.Status) }
+                if ($null -ne $status.DaysRemaining -and ($null -eq $certificateDays -or $status.DaysRemaining -lt $certificateDays)) {
+                    $certificateDays = $status.DaysRemaining
+                }
+            }
+        } catch {
+            $certificateConditions = @('CertificateCheckFailed')
+        }
+        $results += [pscustomobject]@{
+            Route = 'Certificates'
+            Healthy = ($certificateConditions.Count -eq 0)
+            Conditions = $certificateConditions
+            PendingCount = 0
+            OldestPendingMinutes = $null
+            CertificateDaysRemaining = $certificateDays
+        }
         foreach ($result in $results) {
             $routeId = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$result.Route))
             $routeId = $routeId.TrimEnd('=').Replace('+','-').Replace('/','_')
@@ -96,16 +124,27 @@ function Send-NSPScanBridgeAlert {
                 $existing = Get-Content -LiteralPath $marker -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
             }
             if ($existing -and $existing.Active -ne $false -and $existing.Signature -eq $signature) { continue }
-            $subject = '[NSP.ScanBridge] Manual intervention required'
-            $body = @(
-                'ScanBridge detected an unresolved delivery condition.'
-                ('Route: {0}' -f $result.Route)
-                ('Condition codes: {0}' -f $signature)
-                ('Pending documents: {0}' -f $result.PendingCount)
-                ('Oldest pending (minutes): {0}' -f $result.OldestPendingMinutes)
-                'Investigate the restricted local queue and receipts.'
-                'No document content or filenames are included.'
-            ) -join [Environment]::NewLine
+            if ($result.Route -eq 'Certificates') {
+                $subject = '[NSP.ScanBridge] Certificate renewal required'
+                $body = @(
+                    'A ScanBridge app-only certificate is missing, expired or near expiry.'
+                    ('Condition codes: {0}' -f $signature)
+                    ('Fewest days remaining: {0}' -f $result.CertificateDaysRemaining)
+                    'Renew the certificate on the ScanBridge host and update the app registration and settings.'
+                    'No document content or filenames are included.'
+                ) -join [Environment]::NewLine
+            } else {
+                $subject = '[NSP.ScanBridge] Manual intervention required'
+                $body = @(
+                    'ScanBridge detected an unresolved delivery condition.'
+                    ('Route: {0}' -f $result.Route)
+                    ('Condition codes: {0}' -f $signature)
+                    ('Pending documents: {0}' -f $result.PendingCount)
+                    ('Oldest pending (minutes): {0}' -f $result.OldestPendingMinutes)
+                    'Investigate the restricted local queue and receipts.'
+                    'No document content or filenames are included.'
+                ) -join [Environment]::NewLine
+            }
             if ($PSCmdlet.ShouldProcess($alerts.To, 'Send ScanBridge ticket escalation')) {
                 Send-NSPGraphMail -From $alerts.From -To @($alerts.To) -Subject $subject -Body $body -ErrorAction Stop
                 $temp = $marker + '.' + [guid]::NewGuid().ToString('N') + '.tmp'

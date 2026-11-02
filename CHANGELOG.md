@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Send a certificate renewal notice when the ingestion or alert certificate is missing, expired or within `Alerts.CertificateWarningDays` (default 30) of expiry, as its own `Certificates` incident with the existing send-once and resolve-on-recovery markers. `Certificates` becomes a reserved route name.
+
 ## 0.1.0
 
 - Require NSP.M365.Graph 0.1.2 or later when selecting the connector, so an older copy earlier on PSModulePath is skipped rather than loaded; exclude agent/handoff documents from the Gallery package.
