@@ -51,3 +51,5 @@ Session creation retries recognized transient HTTP failures at most three times 
 
 See [deployment and evidence limits](docs/DEPLOYMENT.md) and the placeholder-only [configuration](config/ScanBridge.example.psd1). Real configuration, document content, filenames, addresses, tenant identifiers and credentials stay outside Git.
 For read-only comparison of readiness decisions against live file lifecycles, see [the readiness diagnostic](docs/READINESS-DIAGNOSTIC.md). It uses the existing settings file and never claims or uploads documents.
+
+To find out how a particular scanner delivers to SMB (exclusive direct write, readable direct write or temporary-name rename), see [delivery discovery](docs/DELIVERY-DISCOVERY.md). `Invoke-NSPScanBridgeDeliveryDiscovery` observes test scans in a dedicated folder and saves a classified profile with a conservative policy recommendation and simulator replay settings.

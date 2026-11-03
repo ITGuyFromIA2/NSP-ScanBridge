@@ -4,6 +4,7 @@
 
 - Send a certificate renewal notice when the ingestion or alert certificate is missing, expired or within `Alerts.CertificateWarningDays` (default 30) of expiry, as its own `Certificates` incident with the existing send-once and resolve-on-recovery markers. `Certificates` becomes a reserved route name.
 - Leave structurally incomplete source PDFs (no `%PDF-` header near the start or `%%EOF` near the end) unclaimed, so a cancelled direct-write scan is no longer uploaded as a truncated document. Health reports the oldest unclaimed source age and raises `SourceAge` after 30 minutes.
+- Add read-only `Invoke-NSPScanBridgeDeliveryDiscovery`: observes test scans in a dedicated folder (every file name, watcher and polling, shared-read and exclusive probes, error categories, PDF structure, UTC and monotonic time) and saves an events CSV and a timestamped profile that classifies the device as DirectExclusive, DirectReadable, TempRename, Hybrid or Unknown, with confidence, evidence, a conservative minimum-age recommendation and simulator replay settings. File names are written only with `-IncludeFileNames`.
 
 ## 0.1.0
 
