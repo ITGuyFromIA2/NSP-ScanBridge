@@ -35,7 +35,8 @@ only its own event subscriptions/jobs and dispose watcher/probe handles.
 
 Strict thresholds must be at least the stable thresholds. All selected modes use the same sampled
 file lifecycle and same brief probe. AgeAndExclusive and the production readiness command share
-the metadata predicate. Quiet/sample policies are comparisons, not enabled worker modes.
+the metadata predicate. The production command additionally requires a PDF header and `%%EOF`
+trailer, which this diagnostic does not yet report. Quiet/sample policies are comparisons, not enabled worker modes.
 Metadata-only mode still reports metadataEligible, but holds each policy with LockNotTested;
 it never claims lock-verified WOULD PROCEED. Probe Unavailable can mean a conflicting handle,
 ACL failure or a race with disappearance; it is not proof of an active writer. Every opened probe

@@ -11,7 +11,8 @@ function Test-NSPScanBridgeFileReady {
     $stream = $null
     try {
         $stream = [System.IO.File]::Open($item.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)
-        return $true
+        # Read under the exclusive handle: a cancelled direct-write scan lacks its trailer and stays in Source.
+        return (Test-NSPScanBridgePdfStructure -Stream $stream).Complete
     }
     catch [System.IO.IOException] { return $false }
     finally { if ($null -ne $stream) { $stream.Dispose() } }

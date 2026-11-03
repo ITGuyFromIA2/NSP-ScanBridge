@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Send a certificate renewal notice when the ingestion or alert certificate is missing, expired or within `Alerts.CertificateWarningDays` (default 30) of expiry, as its own `Certificates` incident with the existing send-once and resolve-on-recovery markers. `Certificates` becomes a reserved route name.
+- Leave structurally incomplete source PDFs (no `%PDF-` header near the start or `%%EOF` near the end) unclaimed, so a cancelled direct-write scan is no longer uploaded as a truncated document. Health reports the oldest unclaimed source age and raises `SourceAge` after 30 minutes.
 
 ## 0.1.0
 

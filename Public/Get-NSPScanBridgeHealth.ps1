@@ -45,6 +45,11 @@ function Get-NSPScanBridgeHealth {
         if ($pending.Count -gt 0) {
             $oldest = ($pending | Sort-Object CreationTimeUtc | Select-Object -First 1).CreationTimeUtc
         }
+        # Source age uses the last write, the same clock readiness uses; unclaimed old files are held there.
+        $oldestSource = $null
+        if ($source.Count -gt 0) {
+            $oldestSource = ($source | Sort-Object LastWriteTimeUtc | Select-Object -First 1).LastWriteTimeUtc
+        }
         [pscustomobject]@{
             Route = [string]$route.Name
             SourceCount = $source.Count
@@ -59,6 +64,7 @@ function Get-NSPScanBridgeHealth {
             OrphanReceiptCount = $orphanReceipts
             OldestPendingUtc = $oldest
             OldestPendingMinutes = if ($null -eq $oldest) { $null } else { [math]::Round(([datetime]::UtcNow - $oldest).TotalMinutes,1) }
+            OldestSourceMinutes = if ($null -eq $oldestSource) { $null } else { [math]::Round(([datetime]::UtcNow - $oldestSource).TotalMinutes,1) }
         }
     }
 }

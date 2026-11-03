@@ -39,8 +39,9 @@ Inspect results privately: do not print matched client text into shared logs. A 
 
 - `Invoke-NSPScanBridge -ConfigurationPath <private-config>` performs one intake/delivery pass. Complete expected app-only authentication is required; the active tenant and application must match it.
 - `Invoke-NSPScanBridge ... -IntakeOnly` uses local disk only. Configure expected tenant/app and destination metadata even in this mode so new receipts are bound from intake; no Graph login occurs. Only use approved synthetic fixtures during development.
-- `Get-NSPScanBridgeHealth` reports counts and pending age. It validates pending receipt metadata and SHA-256, so its disk cost grows with the spool.
-- `Test-NSPScanBridgeHealth` reports queue thresholds, held uploads and receipt anomalies.
+- `Get-NSPScanBridgeHealth` reports counts, pending age and the age of the oldest unclaimed source PDF. It validates pending receipt metadata and SHA-256, so its disk cost grows with the spool.
+- `Test-NSPScanBridgeHealth` reports queue thresholds, held uploads, receipt anomalies and `SourceAge` for a source PDF left unclaimed past `-MaximumSourceMinutes` (default 30).
+- `Test-NSPScanBridgeFileReady` also requires a `%PDF-` header in the first 1024 bytes and `%%EOF` in the last 1024, read under its exclusive handle. A cancelled direct-write scan therefore stays in Source, unclaimed and unchanged, until it is completed or removed by an operator; `SourceAge` makes it visible. This is a completeness heuristic, not proof that the document renders.
 - `Resolve-NSPScanBridgeJob ... -RouteName RouteA -JobId <opaque-guid>` accepts both `Uploading` and `Review` jobs. It requires an existing context matching the configured ingestion identity, downloads remote bytes into restricted spool storage, compares exact SHA-256, then archives only a match. It never replays an upload. `-WhatIf` still performs readback but skips receipt/archive changes.
 - `Send-NSPScanBridgeAlert` uses a separately configured app-only mail identity and persistent, serialized alert markers. See [alerting](docs/ALERTING.md).
 

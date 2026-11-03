@@ -20,13 +20,13 @@ function Invoke-NSPGraphRequest {
     param($Method,$Uri,$ErrorAction)
     if($Method -ne 'GET'){throw 'Unexpected Graph write.'}
     $script:lookups++
-    @{id='synthetic-item';size=8;'@microsoft.graph.downloadUrl'='https://example.invalid/binding-content'}
+    @{id='synthetic-item';size=15;'@microsoft.graph.downloadUrl'='https://example.invalid/binding-content'}
 }
 function Invoke-WebRequest {
     param($Uri,$OutFile,[switch]$UseBasicParsing,$ErrorAction)
     if($Uri -ne 'https://example.invalid/binding-content'){throw 'Unexpected download.'}
     $script:downloads++
-    [IO.File]::WriteAllBytes($OutFile,[byte[]](37,80,68,70,45,49,46,52))
+    [IO.File]::WriteAllBytes($OutFile,[byte[]](37,80,68,70,45,49,46,52,10,37,37,69,79,70,10))
 }
 function Invoke-RestMethod { throw 'Network forbidden.' }
 $base=Join-Path ([IO.Path]::GetTempPath()) ('nsp-binding-safety-'+[guid]::NewGuid().ToString('N'))
@@ -48,7 +48,7 @@ try {
     }
     function New-BoundJob([string]$State='Queued') {
         $pdf=Join-Path $base ('spool\'+[guid]::NewGuid().ToString('N')+'.pdf')
-        [IO.File]::WriteAllBytes($pdf,[byte[]](37,80,68,70,45,49,46,52))
+        [IO.File]::WriteAllBytes($pdf,[byte[]](37,80,68,70,45,49,46,52,10,37,37,69,79,70,10))
         Save-NSPScanBridgeReceipt -PdfPath $pdf -State Queued -Binding $original
         if($State -eq 'Uploaded') {
             Save-NSPScanBridgeReceipt -PdfPath $pdf -State Uploading -Binding $original
@@ -59,7 +59,7 @@ try {
     Set-BindingConfig $original
     # Actual intake stamps the expected destination before any upload is possible.
     $source=Join-Path $base 'source\synthetic.pdf'
-    [IO.File]::WriteAllBytes($source,[byte[]](37,80,68,70,45,49,46,52))
+    [IO.File]::WriteAllBytes($source,[byte[]](37,80,68,70,45,49,46,52,10,37,37,69,79,70,10))
     (Get-Item -LiteralPath $source).LastWriteTimeUtc=[datetime]::UtcNow.AddMinutes(-2)
     $claim=@(Invoke-NSPScanBridge -ConfigurationPath $config -IntakeOnly)
     $claimedPdf=Join-Path $base ('spool\'+$claim[0].JobId+'.pdf')
@@ -149,7 +149,7 @@ try {
     [IO.File]::WriteAllText($receipt,$goodJson)
     $null=Invoke-NSPScanBridge -ConfigurationPath $config
     # Certificate rotation is allowed when tenant/application/destination stay fixed.
-    [IO.File]::WriteAllBytes($source,[byte[]](37,80,68,70,45,49,46,52))
+    [IO.File]::WriteAllBytes($source,[byte[]](37,80,68,70,45,49,46,52,10,37,37,69,79,70,10))
     (Get-Item -LiteralPath $source).LastWriteTimeUtc=[datetime]::UtcNow.AddMinutes(-2)
     $configText=[IO.File]::ReadAllText($config)
     [IO.File]::WriteAllText($config,$configText.Replace("TenantId='test-tenant'", "TenantId=''"))

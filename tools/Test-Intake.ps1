@@ -6,7 +6,7 @@ $folders = @('source','spool','archive','lock')
 try {
     foreach ($folder in $folders) { New-Item -ItemType Directory -Path (Join-Path $testRoot $folder) -Force | Out-Null }
     $pdf = Join-Path $testRoot 'source\synthetic.pdf'
-    [IO.File]::WriteAllBytes($pdf, [byte[]](37,80,68,70,45,49,46,52,10))
+    [IO.File]::WriteAllBytes($pdf, [byte[]](37,80,68,70,45,49,46,52,10,37,37,69,79,70,10))
     (Get-Item -LiteralPath $pdf).LastWriteTimeUtc = [DateTime]::UtcNow.AddMinutes(-1)
     $configPath = Join-Path $testRoot 'config.psd1'
     $safeRoot = $testRoot.Replace("'", "''")

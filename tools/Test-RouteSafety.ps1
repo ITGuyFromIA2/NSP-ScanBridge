@@ -38,7 +38,7 @@ try {
     }
     function New-SourcePdf([string]$Directory) {
         $pdf = Join-Path $base ($Directory + '\synthetic.pdf')
-        [IO.File]::WriteAllBytes($pdf,[byte[]](37,80,68,70,45,49,46,52))
+        [IO.File]::WriteAllBytes($pdf,[byte[]](37,80,68,70,45,49,46,52,10,37,37,69,79,70,10))
         (Get-Item -LiteralPath $pdf).LastWriteTimeUtc = [datetime]::UtcNow.AddMinutes(-2)
         $pdf
     }

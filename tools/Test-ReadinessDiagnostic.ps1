@@ -57,7 +57,7 @@ try {
     $config=Join-Path $base 'synthetic.psd1';$safeBase=$base.Replace("'","''")
     [IO.File]::WriteAllText($config,"@{Routes=@(@{Name='RouteA';Source='$safeBase\drop';MinimumAgeSeconds=1},@{Name='RouteB';Source='$safeBase\other';MinimumAgeSeconds=1})}")
     $preexisting=Join-Path $base 'drop/preexisting [x].pdf'
-    [IO.File]::WriteAllBytes($preexisting,[byte[]](37,80,68,70,1))
+    [IO.File]::WriteAllBytes($preexisting,[byte[]](37,80,68,70,45,49,46,52,10,37,37,69,79,70,10))
     (Get-Item -LiteralPath $preexisting).LastWriteTimeUtc=$now.AddMinutes(-2)
     $preHash=(Get-FileHash -LiteralPath $preexisting).Hash
     # The real worker and comparison baseline share their metadata evaluator.

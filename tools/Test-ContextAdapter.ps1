@@ -71,7 +71,7 @@ if (-not ([IO.Path]::GetFullPath($base).StartsWith($tempRoot,[StringComparison]:
 try {
     foreach ($name in 'source','spool','archive','lock','alerts') { [void][IO.Directory]::CreateDirectory((Join-Path $base $name)) }
     $source=Join-Path $base 'source/synthetic.pdf'
-    [IO.File]::WriteAllBytes($source,[byte[]](37,80,68,70,45,49,46,52))
+    [IO.File]::WriteAllBytes($source,[byte[]](37,80,68,70,45,49,46,52,10,37,37,69,79,70,10))
     (Get-Item -LiteralPath $source).LastWriteTimeUtc=[datetime]::UtcNow.AddMinutes(-2)
     $hash=(Get-FileHash -LiteralPath $source).Hash
     $config=Join-Path $base 'synthetic.psd1'; $safeBase=$base.Replace("'","''")
