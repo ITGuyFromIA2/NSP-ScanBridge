@@ -55,7 +55,13 @@ function Invoke-NSPScanBridgeDeliveryDiscovery {
         $finished=$true
     } finally {
         $end=[datetime]::UtcNow
-        $endMs=($end-$start).TotalMilliseconds
+        # The observer's stopwatch starts after $start; anchor elapsed times to its actual UTC zero.
+        $epoch=$start
+        if ($observations.Count) {
+            $zeros=@($observations | ForEach-Object { $_.ObservedUtc.AddMilliseconds(-[double]$_.ElapsedMs).Ticks } | Sort-Object)
+            $epoch=New-Object DateTime ([long]$zeros[[int][math]::Floor(($zeros.Count-1)/2)]),([DateTimeKind]::Utc)
+        }
+        $endMs=($end-$epoch).TotalMilliseconds
         $built=Get-NSPScanBridgeDeliveryLifecycle -Observation @($observations.ToArray()) -PollMilliseconds $PollMilliseconds -QuietSeconds $QuietSeconds -EndMs $endMs
         $deliveryProfile=Get-NSPScanBridgeDeliveryProfile -Lifecycle @($built.Lifecycles) -DeviceName $DeviceName -SessionId $session -PollMilliseconds $PollMilliseconds -QuietSeconds $QuietSeconds -StartUtc $start -EndUtc $end -IgnoredExistingFiles $existing.Count -EndedEarly (-not $finished) -IncludeFileNames:$IncludeFileNames
         $stamp=$end.ToString('yyyyMMddTHHmmssZ')
@@ -76,7 +82,7 @@ function Invoke-NSPScanBridgeDeliveryDiscovery {
         if ($IncludeFileNames -and $built.Lifecycles.Count) {
             $timingPath=Join-Path $output ('timing_{0}.csv' -f $session)
             $timing=foreach ($l in $built.Lifecycles) {
-                $name=$l.Names[$l.Names.Count-1]; $at={ param($ms) $start.AddMilliseconds($ms).ToString('o') }
+                $name=$l.Names[$l.Names.Count-1]; $at={ param($ms) $epoch.AddMilliseconds($ms).ToString('o') }
                 [pscustomobject]@{Filename=$name;Event='DiscoveryFirstSeen';Utc=(& $at $l.FirstMs)}
                 if ($l.Rename) { [pscustomobject]@{Filename=$name;Event='DiscoveryRenamed';Utc=(& $at $l.Rename.ElapsedMs)} }
                 [pscustomobject]@{Filename=$name;Event='DiscoveryLastChange';Utc=(& $at $l.LastChangeMs)}

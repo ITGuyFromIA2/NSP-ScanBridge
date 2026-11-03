@@ -151,6 +151,13 @@ try {
     Check ((($sequence | Sort-Object) -join ',') -eq ($sequence -join ',')) 'Events are not in monotonic order.'
     $timing=@(Import-Csv -LiteralPath $result.TimingPath)
     Check (($timing[0].PSObject.Properties.Name -join ',') -eq 'Filename,Event,Utc' -and @($timing | Where-Object { $_.Filename -eq 'renamed.pdf' -and $_.Event -eq 'DiscoveryRenamed' }).Count -eq 1) 'Timing CSV not in the simulator comparison format.'
+    # Timing must use the observer's clock: first-seen equals the file's first observed event row.
+    foreach ($f in $result.Files) {
+        $seen=[DateTimeOffset]::Parse(($timing | Where-Object { $_.Filename -eq $f.Names[$f.Names.Count-1] -and $_.Event -eq 'DiscoveryFirstSeen' }).Utc,[Globalization.CultureInfo]::InvariantCulture)
+        $row=$events | Where-Object { $_.FileKey -eq $f.Key -and $_.Status -eq 'Present' } | Select-Object -First 1
+        $gap=[math]::Abs(($seen-[DateTimeOffset]::Parse($row.Utc,[Globalization.CultureInfo]::InvariantCulture)).TotalMilliseconds)
+        Check ($gap -le 2) ('Timing first-seen differs from the event log by {0:N1} ms for {1}.' -f $gap,$f.Key)
+    }
     Check ((Get-FileHash -LiteralPath $existing).Hash -eq $existingHash) 'Discovery changed a pre-existing file.'
     Check ((@(Get-ChildItem -LiteralPath $drop -File | ForEach-Object Name | Sort-Object) -join ',') -eq 'aborted.pdf,exclusive.pdf,existing.pdf,readable.pdf,renamed.pdf') 'Discovery moved, removed or created files in the observed folder.'
     Check ((Get-Item (Join-Path $drop 'renamed.pdf')).Length -eq (9+8*4096+6)) 'Delivered bytes were altered.'
