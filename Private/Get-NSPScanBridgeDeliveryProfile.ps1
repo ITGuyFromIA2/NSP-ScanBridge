@@ -67,6 +67,9 @@ function Get-NSPScanBridgeDeliveryProfile {
         'DirectReadable' { $notes.Add('The device lets others read while it writes. An exclusive open still fails while its handle is open, but rely on the minimum age and structure check too.') }
         default { $notes.Add('Behavior is ambiguous: keep the defaults and do not lower MinimumAgeSeconds.') }
     }
+    if (@($Lifecycle | Where-Object { $_.Rename -and $_.Rename.FromExtension -ieq '.pdf' -and $_.Rename.ToExtension -ieq '.pdf' }).Count) {
+        $notes.Add('A temporary name ending in .pdf was renamed to its final name. The worker considers such a file while it is written; rely on the exclusive-open and structure checks, keep the minimum age, and prefer a device setting with a non-PDF temporary name.')
+    }
     $recommendation=[pscustomobject]@{MinimumAgeSeconds=$age;LongestObservedPauseMs=$pause;Basis=('max(20, 2 x longest observed pause + 10 s), sampled every {0} ms' -f $PollMilliseconds);Notes=@($notes)}
 
     $simulator=$null
@@ -89,7 +92,7 @@ function Get-NSPScanBridgeDeliveryProfile {
         Classification=$deviceClass; Confidence=$confidence; Override=$null; Evidence=@($evidence)
         Recommendation=$recommendation; SimulatorSettings=$simulator
         Capture=[pscustomobject][ordered]@{StartUtc=$StartUtc.ToString('o');EndUtc=$EndUtc.ToString('o');PollMilliseconds=$PollMilliseconds;QuietSeconds=$QuietSeconds;IgnoredExistingFiles=$IgnoredExistingFiles;EndedEarly=$EndedEarly;FileNamesIncluded=[bool]$IncludeFileNames}
-        Clock=[pscustomobject][ordered]@{Computer=[Environment]::MachineName;TimeZone=[TimeZoneInfo]::Local.Id;MonotonicHighResolution=[Diagnostics.Stopwatch]::IsHighResolution;TimeServiceType=$w32;RemoteOffsetMeasured=$false}
+        Clock=[pscustomobject][ordered]@{Computer=if($IncludeFileNames){[Environment]::MachineName}else{$null};TimeZone=[TimeZoneInfo]::Local.Id;MonotonicHighResolution=[Diagnostics.Stopwatch]::IsHighResolution;TimeServiceType=$w32;RemoteOffsetMeasured=$false}
         Files=$files
         Limits=@(
             'File observation cannot show SMB CREATE access or share flags, chunk sizes or protocol commands; use SMB server ETW or a packet capture, with consent, for those.'

@@ -26,6 +26,11 @@ function Get-NSPScanBridgeDeliveryClassification {
         $confidence=if($rename.Method -eq 'Watcher' -and $underTemp.Count){'High'}elseif($rename.Method -eq 'Watcher' -or $underTemp.Count){'Medium'}else{'Low'}
         return [pscustomobject]@{Class='TempRename';Confidence=$confidence;Evidence=@($evidence)}
     }
+    if ($rename -and $rename.FromExtension -ieq '.pdf' -and $rename.ToExtension -ieq '.pdf') {
+        # The temporary name already matches the worker's *.pdf filter, so it is visible while written.
+        $evidence.Add(('Renamed {0} -> {1} ({2}): the temporary name already ends in .pdf, so the worker can see it while it is written.' -f $rename.FromExtension,$rename.ToExtension,$rename.Method))
+        return [pscustomobject]@{Class='Hybrid';Confidence='Low';Evidence=@($evidence)}
+    }
     if ($rename) { $evidence.Add(('Renamed {0} -> {1}; not a temporary-to-PDF rename.' -f $rename.FromExtension,$rename.ToExtension)) }
     $direct=@($mid | Where-Object { $_.Extension -ieq '.pdf' -and $_.Shared -in @('Available','Unavailable') })
     if (-not $direct.Count) {

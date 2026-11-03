@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Delivery discovery: a temporary name that already ends in `.pdf` and is renamed to its final name is classified Hybrid, with a recommendation note, because the worker can see that file while it is written. All-files observation now includes hidden and system files when polling. The computer name is recorded only with `-IncludeFileNames`.
+
 ## 0.1.1 (2026-11-03)
 
 - Upgrade note: `SourceAge` and `Certificates` are new alert conditions, so a route with an open alert marker can send one fresh alert after upgrading, when its condition set changes.

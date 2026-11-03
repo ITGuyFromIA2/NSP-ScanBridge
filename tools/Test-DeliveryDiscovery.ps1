@@ -59,6 +59,16 @@ $inferred+=foreach($ms in 1000,1250,6000,12000){ Obs 'C:\d\f.pdf' $ms 400 'Avail
 $life=(Build $inferred).Lifecycles
 Check ($life.Count -eq 1 -and $life[0].Rename.Method -eq 'Inferred' -and $life[0].Rename.FromExtension -eq '.part') 'Polling-only rename not inferred.'
 Check ((Get-NSPScanBridgeDeliveryClassification -Lifecycle $life[0]).Class -eq 'TempRename') 'Inferred rename misclassified.'
+
+# A temporary name that already ends in .pdf is visible to the worker while written: never a clean class.
+$pdfTemp=@(foreach($i in 0..3){ Obs 'C:\d\~p.tmp.pdf' (250*$i) (100*($i+1)) 'Unavailable' 'SharingViolation' 'Unavailable' $null })
+$pdfTemp+=Obs 'C:\d\p.pdf' 1000 400 'Available' $null 'Available' $true 'FileSystemWatcher.Renamed' -OldPath 'C:\d\~p.tmp.pdf'
+$pdfTemp+=foreach($ms in 6000,12000){ Obs 'C:\d\p.pdf' $ms 400 'Available' $null 'Available' $true }
+$pdfLife=(Build $pdfTemp).Lifecycles
+$c=Get-NSPScanBridgeDeliveryClassification -Lifecycle $pdfLife[0]
+Check ($pdfLife.Count -eq 1 -and $c.Class -eq 'Hybrid' -and @($c.Evidence | Where-Object { $_ -like '*already ends in .pdf*' }).Count -eq 1) 'A .pdf-to-.pdf rename was classified as a clean pattern.'
+$pdfProfile=Get-NSPScanBridgeDeliveryProfile -Lifecycle $pdfLife -DeviceName 'Test' -SessionId 's' -PollMilliseconds 250 -QuietSeconds 10 -StartUtc $t0 -EndUtc $t0.AddSeconds(12)
+Check (@($pdfProfile.Recommendation.Notes | Where-Object { $_ -like '*temporary name ending in .pdf*' }).Count -eq 1 -and $null -eq $pdfProfile.SimulatorSettings) 'The .pdf temporary-name risk was not called out.'
 $mismatch=@($inferred | ForEach-Object { if($_.Path -like '*f.pdf' -and $_.Status -eq 'Present'){ $o=$_.PSObject.Copy(); $o.Length=999; $o } else { $_ } })
 Check ((Build $mismatch).Lifecycles.Count -eq 2) 'Rename inferred across different lengths.'
 
@@ -146,6 +156,7 @@ try {
     $saved=Get-Content -LiteralPath $result.ProfilePath -Raw | ConvertFrom-Json
     Check ($saved.Classification -eq 'Hybrid' -and $saved.SchemaVersion -eq 1 -and @($saved.Files).Count -eq 4) 'Saved profile does not match.'
     $events=@(Import-Csv -LiteralPath $result.EventsPath)
+    Check ($saved.Clock.Computer -eq [Environment]::MachineName -and $events[0].Computer -eq [Environment]::MachineName) 'Computer name missing although names were requested.'
     Check (@($events | Where-Object { $_.SharedRead -eq 'Unavailable' -and $_.SharedReadError -eq 'SharingViolation' }).Count -gt 0 -and @($events | Where-Object { [double]$_.LocalMonotonicMs -gt 0 }).Count -gt 0) 'Events CSV lacks probe or monotonic evidence.'
     $sequence=@($events | ForEach-Object { [double]$_.LocalMonotonicMs })
     Check ((($sequence | Sort-Object) -join ',') -eq ($sequence -join ',')) 'Events are not in monotonic order.'
@@ -162,12 +173,13 @@ try {
     Check ((@(Get-ChildItem -LiteralPath $drop -File | ForEach-Object Name | Sort-Object) -join ',') -eq 'aborted.pdf,exclusive.pdf,existing.pdf,readable.pdf,renamed.pdf') 'Discovery moved, removed or created files in the observed folder.'
     Check ((Get-Item (Join-Path $drop 'renamed.pdf')).Length -eq (9+8*4096+6)) 'Delivered bytes were altered.'
 
-    # Polling only, without file names: an inferred rename and anonymous output.
+    # Polling only, without file names: a hidden temporary file, an inferred rename and anonymous output.
     $writer.Dispose(); $writer=[powershell]::Create()
     [void]$writer.AddScript({
         param($Drop)
         Start-Sleep -Milliseconds 600
         $stream=[IO.File]::Open((Join-Path $Drop 'quiet.tmp'),[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+        [IO.File]::SetAttributes((Join-Path $Drop 'quiet.tmp'),[IO.FileAttributes]::Hidden)
         try { $b=[Text.Encoding]::ASCII.GetBytes("%PDF-1.4`n"+('%'+('Y'*4093)+"`r`n")*6+"%%EOF`n"); for($i=0;$i -lt $b.Length;$i+=4096){ $stream.Write($b,$i,[math]::Min(4096,$b.Length-$i)); $stream.Flush(); Start-Sleep -Milliseconds 150 } } finally { $stream.Dispose() }
         [IO.File]::Move((Join-Path $Drop 'quiet.tmp'),(Join-Path $Drop 'quiet.pdf'))
     }.ToString()).AddArgument($drop)
@@ -178,6 +190,7 @@ try {
     Check ($anonymous.Capture.IgnoredExistingFiles -eq 5 -and $null -eq $anonymous.TimingPath) 'Second capture did not ignore earlier files or wrote timing without names.'
     $raw=(Get-Content -LiteralPath $anonymous.ProfilePath -Raw)+(Get-Content -LiteralPath $anonymous.EventsPath -Raw)
     Check ($raw -notmatch 'quiet\.(tmp|pdf)' -and $raw -notmatch [regex]::Escape($drop.Replace('\','\\')) -and $raw -notmatch [regex]::Escape($drop)) 'Anonymous capture disclosed names or paths.'
+    Check ($raw -notmatch [regex]::Escape([Environment]::MachineName)) 'Anonymous capture disclosed the computer name.'
     Check (@(Get-EventSubscriber | Where-Object {$_.SubscriptionId -notin $beforeSubscriptions}).Count -eq 0) 'Discovery leaked event subscriptions.'
     Check (@(Get-Job | Where-Object {$_.Id -notin $beforeJobs}).Count -eq 0) 'Discovery leaked event jobs.'
     Write-Host ('Passed: {0} delivery discovery checks with synthetic lifecycles and exclusive/readable/rename/abort writers.' -f $checks)

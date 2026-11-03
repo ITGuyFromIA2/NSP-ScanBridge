@@ -34,7 +34,7 @@ function Watch-NSPScanBridgeFileObservation {
         $record=[ordered]@{Route=$Source.Name;Path=$Path;Source=$Label;ObservedUtc=$ObservedUtc;Status='Missing';Length=0L;LastWriteTimeUtc=[datetime]::MinValue;CreationTimeUtc=[datetime]::MinValue;ProbeStatus='NotTested'}
         if ($DeliveryProbe) { $record.ElapsedMs=[math]::Round($clock.Elapsed.TotalMilliseconds,3); $record.OldPath=$OldPath; $record.SharedProbeStatus='NotTested'; $record.SharedProbeError=$null; $record.ProbeError=$null; $record.StructureComplete=$null }
         try {
-            $item=Get-Item -LiteralPath $Path -ErrorAction Stop
+            $item=Get-Item -LiteralPath $Path -Force:$AllFiles -ErrorAction Stop
             if ($item.PSIsContainer) { return }
             $record.Status='Present'; $record.Length=$item.Length; $record.LastWriteTimeUtc=$item.LastWriteTimeUtc; $record.CreationTimeUtc=$item.CreationTimeUtc
             if ($DeliveryProbe) {
@@ -113,7 +113,8 @@ function Watch-NSPScanBridgeFileObservation {
             }
             foreach ($source in $Sources) {
                 try {
-                    Get-ChildItem -LiteralPath $source.Path -Filter $pattern -File -ErrorAction Stop | ForEach-Object {
+                    # All-files mode also sees hidden and system temporary names; the worker's view stays unchanged.
+                    Get-ChildItem -LiteralPath $source.Path -Filter $pattern -File -Force:$AllFiles -ErrorAction Stop | ForEach-Object {
                         if ($ignored.Contains($_.FullName)) { return }
                         $key=[string]$source.Name+'|'+$_.FullName
                         if (-not $tracked.ContainsKey($key)) {

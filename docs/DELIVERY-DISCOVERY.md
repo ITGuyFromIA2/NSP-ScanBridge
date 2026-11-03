@@ -20,9 +20,11 @@ be outside the observed folder.
 
 ## What is observed
 
-Every new file name, including temporary names, through FileSystemWatcher events (Created,
-Changed, Renamed, Deleted) and polling of size and modified time every `-PollMilliseconds`
-(default 250). Each sample probes the file twice and closes each handle immediately:
+Every new file name, including temporary, hidden and system names, through FileSystemWatcher
+events (Created, Changed, Renamed, Deleted) and polling of size and modified time every
+`-PollMilliseconds` (default 250). Watcher events are stamped when processed, so their times are
+bounded by the polling interval. Each sample probes the file twice and closes each handle
+immediately:
 
 - **Shared read:** read access that lets the writer keep writing, renaming and deleting. A writer
   that opened the file exclusively refuses it with a sharing violation.
@@ -45,7 +47,7 @@ count as evidence.
 | TempRename | A temporary name renamed to `.pdf`, with no change after the rename |
 | DirectExclusive | Growth at the `.pdf` name; shared reads refused by sharing violations |
 | DirectReadable | Growth at the `.pdf` name; shared reads allowed |
-| Hybrid | Shared reads alternated, growth continued after a rename, or completed files disagree |
+| Hybrid | Shared reads alternated, growth continued after a rename, a temporary name already ending in `.pdf` was renamed (the worker can see such a file while it is written), or completed files disagree |
 | Unknown | No sample while changing, or probes failed for other reasons, such as access denied |
 
 Confidence is High with three or more consistent samples, Medium with one or two, and Low
@@ -55,14 +57,15 @@ Unknown or Hybrid rather than being forced into a class.
 ## Output
 
 - `events_<session>.csv`: one row per observation, with UTC, local monotonic milliseconds,
-  sequence, computer, file key (F1, F2...), extension, event, size, probe results and errors.
+  sequence, file key (F1, F2...), extension, event, size, probe results and errors.
 - `profile_<device>_<UTC>.json`: classification, confidence, evidence, per-file summaries,
   recommendation, simulator settings, capture and clock metadata, and limits. `Override` is
   reserved for an operator's manual classification. Each capture writes a new timestamped file.
-- With `-IncludeFileNames` only: file names in both files, plus `timing_<session>.csv` in the
-  `Filename,Event,Utc` form that `Compare-MfpScanTiming.ps1` reads. Its events are
-  DiscoveryFirstSeen, DiscoveryRenamed, DiscoveryLastChange and DiscoveryComplete. Without the
-  switch, no file names or paths are written.
+- With `-IncludeFileNames` only: file names and this computer's name in both files, plus
+  `timing_<session>.csv` in the `Filename,Event,Utc` form that `Compare-MfpScanTiming.ps1` reads.
+  Its events are DiscoveryFirstSeen, DiscoveryRenamed, DiscoveryLastChange and DiscoveryComplete.
+  Without the switch, no file names, paths or computer name are written, so a profile can be
+  shared for comparison.
 
 ## Recommendation and simulator settings
 

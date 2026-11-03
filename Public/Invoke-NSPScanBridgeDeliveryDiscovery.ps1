@@ -70,7 +70,7 @@ function Invoke-NSPScanBridgeDeliveryDiscovery {
         $rows=for ($i=0; $i -lt $observations.Count; $i++) {
             $o=$observations[$i]; $owner=$built.Owners[$i]
             [pscustomobject][ordered]@{
-                SchemaVersion=1; SessionId=$session; Sequence=$i+1; Utc=$o.ObservedUtc.ToString('o'); LocalMonotonicMs=$o.ElapsedMs; Computer=[Environment]::MachineName
+                SchemaVersion=1; SessionId=$session; Sequence=$i+1; Utc=$o.ObservedUtc.ToString('o'); LocalMonotonicMs=$o.ElapsedMs; Computer=if($IncludeFileNames){[Environment]::MachineName}else{$null}
                 FileKey=if($owner){$owner.Key}else{$null}; Name=if($IncludeFileNames){[IO.Path]::GetFileName($o.Path)}else{$null}; Extension=[IO.Path]::GetExtension($o.Path)
                 Event=$o.Source; Status=$o.Status; Bytes=$o.Length; LastWriteUtc=if($o.Status -eq 'Present'){$o.LastWriteTimeUtc.ToString('o')}else{$null}
                 SharedRead=$o.SharedProbeStatus; SharedReadError=$o.SharedProbeError; Exclusive=$o.ProbeStatus; ExclusiveError=$o.ProbeError; StructureComplete=$o.StructureComplete
