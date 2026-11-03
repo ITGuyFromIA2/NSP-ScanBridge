@@ -1,6 +1,6 @@
 @{
  RootModule = 'NSP.ScanBridge.psm1'
- ModuleVersion = '0.1.0'
+ ModuleVersion = '0.1.1'
  GUID = 'f18f448f-c735-4b80-a503-95a5f7098fd9'
  Author = 'Network Systems Plus'
  CompanyName = 'Network Systems Plus'
